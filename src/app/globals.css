@@ -1,0 +1,745 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: Vazirmatn;
+  src: url("/fonts/vazirmatn-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/*
+ * Color system.
+ *
+ * One neutral ramp, one brand ramp, one brass ramp, and only the status ramps the
+ * product actually renders. Primitives name a hue and are never applied directly
+ * in a component; the semantic tokens in :root name a job and are the only tier
+ * components reference. That seam is what makes a future theme a token swap.
+ *
+ * `success` is deliberately a brighter, cooler green than `action`. The old value
+ * sat within a few degrees of the accent, so a successful action and an
+ * interactive one were the same color — meaning was carried by position alone.
+ */
+@theme {
+  --font-sans: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
+
+  /* neutral ramp */
+  --color-bone-50: #fdfcf9;
+  --color-bone-100: #f6f5f1;
+  --color-bone-200: #edece8;
+  --color-bone-300: #e5e0d4;
+  --color-bone-500: #59636b;
+  --color-bone-600: #3f5548;
+  --color-bone-700: #1f2e27;
+  --color-bone-800: #1a2e25;
+
+  /* brand ramp — hue held constant, density tighter at the light end */
+  --color-brand-50: #e3f0e9;
+  --color-brand-100: #cfe5da;
+  --color-brand-200: #a9d0bd;
+  --color-brand-400: #2f4a3a;
+  --color-brand-600: #14432f;
+  --color-brand-700: #0f5a3b;
+  --color-brand-800: #0b4a30;
+
+  /* brass ramp — second accent, earns its place on price and shop surfaces */
+  --color-brass-50: #f7f0d8;
+  --color-brass-200: #eadfb8;
+  --color-brass-700: #6b5213;
+  --color-brass-800: #8a6a1e;
+
+  /* status */
+  --color-success: #2e7d4f;
+  --color-warning: #8a6a1e;
+  --color-danger: #9f3b4c;
+
+  /* legacy aliases kept so existing utilities keep resolving */
+  --color-ink: #fdfcf9;
+  --color-surface: #ffffff;
+  --color-teal: #0f5a3b;
+  --color-teal-dark: #0f5a3b;
+  --color-sage: #e3f0e9;
+}
+
+:root {
+  /* ---- semantic roles ---- */
+  --color-bg: #fdfcf9;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f6f5f1;
+  --color-text-primary: #1a2e25;
+  --color-text-secondary: #3f5548;
+  --color-text-muted: #59636b;
+  --color-action-primary: #0f5a3b;
+  --color-action-primary-hover: #14432f;
+  --color-accent-soft: #e3f0e9;
+  --color-brass-text: #6b5213;
+  --color-success: #2e7d4f;
+  --color-warning: #8a6a1e;
+  --color-danger: #9f3b4c;
+  --color-booking: #0f5a3b;
+  --color-academy: #3f5548;
+  --color-shop: #f7f0d8;
+
+  /* Structural separators. These are borders on purpose: they carry layout
+     separation, not depth, so they are not promoted to shadows. */
+  --color-border: #e5e0d4;
+  --color-border-strong: #d7dbd8;
+
+  /* ---- radius ----
+     Concentric by construction: an inner surface inset by `padding` inside an
+     outer surface uses `radius-outer = radius-inner + padding`. */
+  --radius-control: 12px; /* buttons, chips */
+  --radius-input: 16px; /* inputs, dialogs */
+  --radius-card: 20px; /* cards, bento tiles */
+  --radius-panel: 24px; /* page-level panels */
+  --radius-bento: 28px; /* hero bento tiles */
+  --radius-pill: 100px;
+  --radius-media: 18px; /* images inside a 20px card with 1px inset */
+
+  /* ---- spacing ----
+     Intra-group 12px, inter-group 24px+: the gap between groups is 2x the gap
+     within one, so space alone carries grouping before any separator line. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --gap-control: 12px; /* adjacent bordered/filled controls */
+  --gap-borderless: 24px; /* around borderless text/icon controls */
+
+  /* ---- depth ----
+     Three layers: a 1px ring standing in for the old border, a subtle lift, and
+     ambient depth. Transparency means these adapt over the hero media too. */
+  --shadow-border:
+    0 0 0 1px oklch(0 0 0 / 0.06),
+    0 1px 2px -1px oklch(0 0 0 / 0.06),
+    0 2px 4px 0 oklch(0 0 0 / 0.04);
+  --shadow-border-hover:
+    0 0 0 1px oklch(0 0 0 / 0.08),
+    0 1px 2px -1px oklch(0 0 0 / 0.08),
+    0 2px 4px 0 oklch(0 0 0 / 0.06);
+  --shadow-raised:
+    0 0 0 1px oklch(0 0 0 / 0.07),
+    0 4px 12px -2px oklch(0 0 0 / 0.08),
+    0 12px 28px -8px oklch(0 0 0 / 0.1);
+
+  /* ---- motion ----
+     Named properties only, never `all`. Interactive state changes use
+     transitions so a mid-flight intent change retargets instead of restarting. */
+  --duration-instant: 100ms;
+  --duration-fast: 130ms;
+  --duration-normal: 210ms;
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  /* Smoothing belongs on the root, once, never per component. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: #d9ece1;
+  color: #1a2e25;
+}
+
+a,
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible,
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---------- shell ---------- */
+
+.ui-shell {
+  min-height: 100svh;
+  background: var(--color-bg);
+}
+
+.ui-container {
+  max-width: 1180px;
+  padding-inline: clamp(16px, 4vw, 48px);
+  margin-inline: auto;
+}
+
+.ui-page {
+  padding-block: clamp(30px, 5vw, 64px) 96px;
+}
+
+/* ---------- type ---------- */
+
+.ui-pagehead {
+  margin-bottom: 30px;
+}
+.ui-pagehead h1 {
+  font-size: clamp(27px, 3vw, 38px);
+  /* Headings are short and set tight; the cap keeps the measure readable. */
+  line-height: 1.25;
+  font-weight: 850;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.ui-pagehead p {
+  margin-top: 6px;
+  line-height: 1.9;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  max-width: 62ch;
+  text-wrap: pretty;
+}
+
+.ui-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+.ui-section-head h2 {
+  font-size: clamp(20px, 2.2vw, 26px);
+  line-height: 1.35;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.ui-section-head p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+/* Numbers that change in place get tabular figures, so digits do not reflow the
+   row as a counter or price updates. */
+.ui-num,
+.ui-price,
+.ui-stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* ---------- surfaces ---------- */
+
+.ui-card,
+.glass-card,
+.glass-subtle,
+.ui-panel,
+.bento-card {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-border);
+  border-radius: var(--radius-card);
+  transition-property: box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+.ui-card:hover,
+.glass-card:hover,
+.bento-card:hover {
+  box-shadow: var(--shadow-border-hover);
+}
+
+.ui-panel {
+  border-radius: var(--radius-panel);
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.glass-floating {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow-raised);
+  border-radius: 20px;
+  backdrop-filter: blur(16px);
+}
+
+/* Images carry a 1px ring drawn just inside the edge so they read at the same
+   depth as bordered surfaces. Pure black, never a tinted near-black, which would
+   pick up the surface underneath and look like dirt on the image. */
+img,
+video.atelier-media {
+  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline-offset: -1px;
+}
+img.media-plain,
+.atelier-hero-photo,
+img.no-outline {
+  outline: none;
+}
+
+/* ---------- controls ---------- */
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding-inline: 20px;
+  border-radius: var(--radius-control);
+  background: var(--color-action-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+  transition-property: background-color, scale, opacity;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+.ui-button:hover {
+  background: var(--color-action-primary-hover);
+}
+/* Press feedback. 0.96 is the floor — anything below 0.95 reads as exaggerated. */
+.ui-button:active,
+.bento-card-interactive:active {
+  scale: 0.96;
+}
+.ui-button:disabled {
+  opacity: 0.45;
+}
+.ui-button-quiet {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-border);
+}
+.ui-button-quiet:hover {
+  background: var(--color-surface-sunken);
+}
+
+.home-service-link,
+.home-team-member,
+.home-portfolio-card {
+  transition-property: background-color, box-shadow, transform;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+.home-service-icon {
+  transition-property: background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+.home-portfolio-image {
+  transition-property: transform;
+  transition-duration: var(--duration-normal);
+  transition-timing-function: var(--ease-standard);
+}
+
+.home-portfolio-curtain {
+  min-height: 360px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.home-page-section {
+  min-height: 90vh;
+  min-height: 90svh;
+  display: grid;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.home-portfolio-curtain::-webkit-scrollbar {
+  display: none;
+}
+
+.home-portfolio-panel {
+  position: relative;
+  flex: 0 0 44px;
+  scroll-snap-align: start;
+}
+
+.home-portfolio-panel[data-active="true"] {
+  flex-basis: min(48vw, 640px);
+}
+
+.home-portfolio-scrim {
+  background: linear-gradient(to top, rgb(10 35 24 / 88%), rgb(10 35 24 / 8%) 58%, transparent);
+}
+
+.home-portfolio-closed-label {
+  writing-mode: vertical-rl;
+  opacity: 1;
+}
+
+.home-portfolio-panel[data-active="true"] .home-portfolio-closed-label {
+  opacity: 0;
+}
+
+.home-portfolio-caption {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.home-portfolio-panel[data-active="true"] .home-portfolio-caption {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (min-width: 640px) {
+  .home-portfolio-curtain {
+    min-height: 420px;
+    overflow: hidden;
+  }
+
+  .home-portfolio-panel {
+    flex: 0.72 1 0%;
+  }
+
+  .home-portfolio-panel[data-active="true"] {
+    flex: 5 1 0%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .home-service-link:hover,
+  .home-team-member:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-raised);
+  }
+  .home-team-member:hover {
+    background-color: var(--color-bg);
+  }
+  .home-service-link:hover .home-service-icon {
+    background-color: var(--color-brand-100);
+  }
+  .home-portfolio-card:hover .home-portfolio-image {
+    transform: scale(1.025);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-portfolio-panel {
+    transition-property: flex-basis, flex-grow, flex-shrink, border-radius;
+    transition-duration: 950ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .home-portfolio-closed-label {
+    transition-property: opacity;
+    transition-duration: 150ms;
+  }
+
+  .home-portfolio-caption {
+    transition-property: opacity, transform;
+    transition-duration: 180ms;
+    transition-timing-function: var(--ease-enter);
+  }
+
+  .home-hero-scroll svg {
+    animation: home-scroll-cue 1.2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-service-link,
+  .home-service-icon,
+  .home-team-member,
+  .home-portfolio-card,
+  .home-portfolio-image {
+    transition: none;
+  }
+
+  .home-portfolio-caption {
+    transform: none;
+  }
+
+  .home-hero-scroll svg {
+    animation: none;
+  }
+}
+
+@keyframes home-scroll-cue {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+/* Optical alignment: an icon makes symmetric padding look pushed to one side, so
+   the icon edge gets 2px less. Logical properties keep it correct in RTL. */
+.ui-button:has(> .atelier-icon:last-child) {
+  padding-inline-end: 18px;
+}
+.ui-button:has(> .atelier-icon:first-child) {
+  padding-inline-start: 18px;
+}
+
+.ui-input {
+  width: 100%;
+  min-height: 48px;
+  padding-inline: 14px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  /* Inputs stay at 16px on mobile: anything smaller makes iOS Safari zoom the
+     whole page on focus. The intended 14px look returns from sm upward. */
+  font-size: 16px;
+  transition-property: border-color, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+@media (min-width: 640px) {
+  .ui-input {
+    font-size: 14px;
+  }
+}
+.ui-input:focus-visible {
+  border-color: var(--color-action-primary);
+}
+
+.ui-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ui-text-muted {
+  color: var(--color-text-muted);
+}
+
+/* ---------- pills and tags ---------- */
+
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ui-tag-academy {
+  background: var(--color-accent-soft);
+  color: #2f4a3a;
+}
+.ui-tag-booking {
+  background: #e0f4f6;
+  color: #2f4a3a;
+}
+.ui-tag-shop {
+  background: var(--color-brass-50);
+  color: var(--color-brass-text);
+}
+
+.ui-link {
+  color: #2f4a3a;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.ui-link:hover {
+  /* Underline metrics come from the font, so the line clears descenders. */
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------- separators ---------- */
+
+.ui-rule,
+.gold-rule {
+  height: 1px;
+  background: var(--color-border);
+}
+.hairline {
+  border-color: var(--color-border);
+}
+
+/* ---------- bento ---------- */
+
+.bento-card {
+  background: var(--color-surface);
+  border-radius: 20px;
+}
+.bento-card-interactive {
+  transition-property: scale, box-shadow, background-color;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: ease-out;
+}
+.bento-shortcut-booking {
+  background: #0f5a3b;
+  color: #fff;
+  border: 1px solid #7fc9a6;
+}
+.bento-shortcut-academy {
+  background: #e3f0e9;
+  color: #2f4a3a;
+  border: 1px solid #bfe0d2;
+}
+.bento-shortcut-shop {
+  background: #f7f0d8;
+  color: #6b5213;
+  border: 1px solid #eadfb8;
+}
+.bento-shortcut-contact {
+  background: #e3f0e9;
+  color: #2f4a3a;
+  border: 1px solid #bfe0d2;
+}
+
+/* ---------- icons ---------- */
+
+/* Icon stroke carries the optical weight of the text beside it: hairline next to
+   regular text, solid next to semibold. One weight per set, recolored via
+   currentColor so state comes from CSS and never from a second asset. */
+.atelier-icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  stroke-width: 1.5;
+}
+.atelier-icon-strong {
+  stroke-width: 2;
+}
+.solid-star {
+  fill: currentColor;
+}
+
+/* ---------- skeleton, toast, reveal ---------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #edece8;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, #fff9, transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+.toast-item {
+  animation: toast-in 0.2s var(--ease-enter);
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.safe-bottom {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.reveal,
+.reveal-clip {
+  opacity: 1;
+  transform: none;
+  clip-path: none;
+}
+.reveal[data-visible="false"] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+.reveal {
+  transition-property: opacity, transform;
+  transition-duration: var(--duration-normal);
+  transition-timing-function: var(--ease-enter);
+}
+.reveal-clip[data-visible="false"] {
+  clip-path: inset(0 0 100% 0);
+}
+.reveal-clip {
+  transition-property: clip-path;
+  transition-duration: 450ms;
+  transition-timing-function: var(--ease-enter);
+}
+
+/* ---------- dialogs ---------- */
+
+.policy-dialog,
+.auth-dialog {
+  max-height: min(92svh, 780px);
+  margin: auto;
+}
+.policy-dialog::backdrop,
+.auth-dialog::backdrop {
+  background: rgba(17, 23, 29, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 639px) {
+  .policy-dialog,
+  .auth-dialog {
+    margin: auto 0 0;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal,
+  .reveal-clip {
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "_comment": "Preview-only scaffold. OTP delivery and the payment gateway need real providers in production; these flags let the sandbox exercise those flows end to end. Remove this file and the OTP_DEMO_MODE / PAYMENT_DEMO_MODE / GUEST_BOOKING branches before going live.",
+  "otpDemoMode": true,
+  "otpDemoPhones": ["09129998877", "09121111111"],
+  "paymentDemoMode": true
+}

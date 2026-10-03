@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="آکادمی زیبایی فرشید معروف پور">
+  <rect width="1024" height="1024" rx="224" fill="#101111" />
+  <g transform="translate(281 200) scale(0.7)">
+    <path fill="#ffffff" fill-rule="evenodd" d="M5 105L92 332H568L655 105L470 196L330 8L190 196ZM92 352H322V884H220L92 706ZM158 412H322V500H158ZM158 556H322V620H220V884L158 798ZM340 352H568V706L440 884H340ZM400 412H420V884H400ZM480 412H500V801L480 828Z" />
+  </g>
+</svg>

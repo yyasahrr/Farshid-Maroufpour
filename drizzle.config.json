@@ -1,0 +1,13 @@
+{
+  "schema": "./src/db/schema.ts",
+  "dialect": "postgresql",
+  "dbCredentials": {
+    "url": "postgresql://postgres@127.0.0.1:5434/app_db"
+  },
+  "migrations": {
+    "db": "pg",
+    "table": "drizzle_migrations",
+    "schema": "public",
+    "schemaFolder": "./drizzle"
+  }
+}

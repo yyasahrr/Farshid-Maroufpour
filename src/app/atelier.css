@@ -1,0 +1,1740 @@
+/* Reference-led public shell. Operational panels keep their green/gold tokens. */
+@font-face {
+  font-family: Vazirmatn;
+  src: url("/fonts/vazirmatn-variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+:root {
+  --atelier-black: #181a19;
+  --atelier-gold: #a37b45;
+  --atelier-muted: #797b80;
+  --atelier-line: #e5e3e1;
+  --atelier-header-height: 80px;
+}
+.atelier-icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.atelier-header {
+  height: var(--atelier-header-height);
+  position: relative;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid #eeeae4;
+}
+.atelier-nav {
+  width: 91%;
+  max-width: 1580px;
+  height: 100%;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  color: var(--atelier-black);
+}
+.atelier-brand {
+  display: block;
+  flex-shrink: 0;
+}
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: #101111;
+}
+.brand-monogram {
+  height: 51px;
+  width: 38px;
+}
+.brand-wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.brand-wordmark > span {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 25px;
+  letter-spacing: 5px;
+  line-height: 1.2;
+  position: relative;
+}
+.brand-wordmark sup {
+  position: absolute;
+  top: -3px;
+  right: -9px;
+  font: 9px Arial;
+  letter-spacing: 0;
+  color: #666;
+}
+.brand-wordmark small {
+  font:
+    7px/1.6 Arial,
+    sans-serif;
+  letter-spacing: 1.55px;
+}
+.atelier-nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(24px, 3.1vw, 52px);
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.atelier-nav-links a,
+.services-dropdown summary {
+  transition: color 0.18s ease;
+}
+.atelier-nav-links a:hover,
+.atelier-nav-links [aria-current="page"],
+.services-dropdown summary:hover {
+  color: var(--atelier-gold);
+}
+.services-dropdown {
+  position: relative;
+}
+.services-dropdown summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  min-height: 44px;
+}
+.services-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+.services-dropdown summary .atelier-icon {
+  width: 15px;
+  height: 15px;
+  color: #777;
+}
+.services-dropdown[open] summary .atelier-icon {
+  transform: rotate(180deg);
+}
+.services-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: -24px;
+  min-width: 240px;
+  border: 1px solid #e7e2da;
+  background: #fff;
+  box-shadow: 0 14px 45px #221b1020;
+  border-radius: 16px;
+  padding: 12px;
+}
+.services-dropdown-panel a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 13px 12px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+.services-dropdown-panel a:hover {
+  background: #f6f4f0;
+}
+.services-dropdown-panel .atelier-icon {
+  width: 17px;
+  height: 17px;
+  color: var(--atelier-gold);
+}
+.services-dropdown-panel a:first-child {
+  border-bottom: 1px solid #eee8df;
+  border-radius: 0;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+.atelier-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-shrink: 0;
+}
+.header-search,
+.atelier-mobile-menu summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.2s;
+}
+.header-search:hover {
+  background: #f4f2ee;
+}
+.header-search .atelier-icon {
+  width: 25px;
+  height: 25px;
+  stroke-width: 1.5;
+}
+.header-account {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 11px 23px;
+  min-height: 46px;
+  border-radius: 30px;
+  background: linear-gradient(120deg, #202321, #141615);
+  color: white;
+  font-size: 14px;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px #ffffff10;
+  transition: background 0.2s;
+}
+.header-account:hover {
+  background: #30342f;
+}
+.header-account .atelier-icon {
+  color: #b99157;
+  width: 22px;
+  height: 22px;
+}
+.atelier-mobile-menu {
+  display: none;
+  position: relative;
+}
+.atelier-mobile-menu summary {
+  list-style: none;
+}
+.atelier-mobile-menu summary::-webkit-details-marker {
+  display: none;
+}
+.atelier-mobile-menu > div {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  min-width: 240px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 15px 50px #0002;
+  border: 1px solid #e7e3dc;
+}
+.atelier-mobile-menu a {
+  display: block;
+  padding: 12px 15px;
+  border-radius: 8px;
+}
+.atelier-mobile-menu a:hover {
+  background: #f3f1eb;
+}
+.atelier-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 740px;
+  height: calc(100svh - var(--atelier-header-height));
+  max-height: 1050px;
+  background: #f7f5f1;
+  overflow: hidden;
+  color: var(--atelier-black);
+}
+.atelier-hero .atelier-hero-photo {
+  object-fit: cover;
+  object-position: center center;
+  z-index: -3;
+}
+.hero-light-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -2;
+  background:
+    radial-gradient(
+      ellipse 55% 40% at 50% 100%,
+      #fff 0%,
+      #ffffffec 36%,
+      #ffffff00 86%
+    ),
+    linear-gradient(
+      90deg,
+      #fdfcfb9c 0%,
+      #fdfcfb80 32%,
+      #fdfcfb15 54%,
+      transparent 65%
+    );
+}
+.hero-copy {
+  position: absolute;
+  top: 9.3%;
+  left: 4.6%;
+  width: 45.8%;
+  text-align: right;
+  z-index: 1;
+}
+.hero-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  direction: ltr;
+  justify-content: flex-start;
+  color: #64676a;
+  font-size: 14px;
+  margin: 0 0 30px;
+}
+.hero-eyebrow > span:first-child,
+.hero-eyebrow > span:last-child {
+  width: 39px;
+  height: 1px;
+  background: #9c9d9e;
+}
+.hero-eyebrow > span:nth-child(2) {
+  direction: rtl;
+}
+.hero-copy h1 {
+  font-size: clamp(42px, 4.85vw, 84px);
+  font-weight: 900;
+  line-height: 1.6;
+  letter-spacing: -2.7px;
+  white-space: nowrap;
+  margin: 0;
+  color: #090b0a;
+}
+.hero-copy h1 em {
+  font-style: normal;
+  color: var(--atelier-gold);
+  background: linear-gradient(155deg, #bba079, #916833);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.hero-description {
+  font-size: clamp(14px, 1.45vw, 24px);
+  line-height: 1.95;
+  font-weight: 400;
+  margin: 14px 0 0;
+  white-space: nowrap;
+  color: #343637;
+  letter-spacing: -0.3px;
+}
+.hero-promises {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  direction: ltr;
+  gap: 20px;
+  margin: 37px 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 600px;
+  font-size: 14px;
+  color: #56585b;
+}
+.hero-promises li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+.hero-promises li + li {
+  border-left: 1px solid #aaaba9;
+  padding-left: clamp(14px, 1.7vw, 29px);
+}
+.hero-promises .atelier-icon {
+  color: var(--atelier-gold);
+  width: 25px;
+  height: 25px;
+  stroke-width: 1.8;
+}
+.hero-booking-position {
+  position: absolute;
+  left: 4.7%;
+  right: 4.7%;
+  top: 44.3%;
+  z-index: 5;
+}
+.hero-reservation {
+  width: 100%;
+  scroll-margin-top: 35px;
+}
+.hero-booking-tabs {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  direction: ltr;
+  width: 435px;
+  max-width: 90%;
+  height: 63px;
+  margin: 0 auto;
+  isolation: isolate;
+}
+.hero-booking-tab {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  direction: rtl;
+  width: 50%;
+  height: 100%;
+  cursor: pointer;
+  color: #65666a;
+  font-size: 17px;
+  white-space: nowrap;
+  padding: 0 20px 5px;
+  transition: color 0.2s;
+}
+.hero-booking-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0 -7px -7px;
+  background: rgba(235, 232, 230, 0.96);
+  border-radius: 25px 25px 0 0;
+  z-index: -1;
+  transform: skewX(13deg);
+  box-shadow: 0 -2px 0 #ffffff80;
+}
+.hero-booking-tab:first-child::before {
+  transform: skewX(-13deg);
+}
+.hero-booking-tab.is-active {
+  color: #171817;
+  font-weight: 650;
+  z-index: 2;
+}
+.hero-booking-tab.is-active::before {
+  background: #fefefdfc;
+  box-shadow:
+    0 -3px 0 #ffffff5c,
+    0 -6px 0 #b6a58b19;
+}
+.hero-booking-tab.is-active::after {
+  content: "";
+  height: 1px;
+  position: absolute;
+  bottom: 4px;
+  left: 26px;
+  right: 26px;
+  background: #b99a70;
+}
+.hero-booking-tab .atelier-icon {
+  width: 26px;
+  height: 26px;
+  stroke-width: 1.7;
+}
+.hero-booking-tab.is-active .atelier-icon {
+  color: var(--atelier-gold);
+}
+.hero-booking-panel {
+  position: relative;
+  z-index: 3;
+  border: 1px solid #fff;
+  background: rgba(255, 255, 255, 0.965);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border-radius: 29px;
+  padding: 35px 29px 38px;
+  box-shadow:
+    0 20px 44px #3c302214,
+    inset 0 1px 0 #fff;
+}
+.hero-booking-grid {
+  display: grid;
+  grid-template-columns: 1.12fr 1fr 0.94fr 0.92fr 0.81fr;
+  align-items: end;
+  gap: 21px;
+  direction: rtl;
+}
+.hero-booking-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  position: relative;
+}
+.hero-field-label {
+  padding-right: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #292b2d;
+}
+.hero-field-control {
+  display: flex;
+  align-items: center;
+  position: relative;
+  border: 1px solid #e2e3e5;
+  box-shadow: 0 1px 2px #00000002;
+  border-radius: 12px;
+  height: 53px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.hero-field-control > .atelier-icon:first-child {
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  color: #292c2d;
+  pointer-events: none;
+}
+.hero-field-control .field-chevron {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: #767a7d;
+  pointer-events: none;
+}
+.hero-field-control select,
+.hero-field-control input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 43px 0 31px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: right;
+  color: #52565b;
+  min-width: 0;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.hero-field-control select:has(option[value=""]:checked) {
+  color: #717579;
+}
+.hero-field-control select:disabled {
+  opacity: 1;
+  color: #717579;
+  cursor: default;
+}
+.hero-field-control input[readonly] {
+  color: #777b80;
+  font-size: 13px;
+  cursor: default;
+}
+.hero-field-control:focus-within {
+  border-color: var(--atelier-gold);
+  box-shadow: 0 0 0 3px #a37b4512;
+}
+.hero-reserve-button {
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 19px;
+  background: linear-gradient(125deg, #242725, #151716);
+  color: white;
+  border: 1px solid #262a26;
+  border-radius: 17px;
+  font-size: 20px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow:
+    0 3px 6px #00000012,
+    inset 0 1px 1px #ffffff15;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.hero-reserve-button > .atelier-icon {
+  width: 24px;
+  height: 24px;
+  color: #b58d52;
+}
+.hero-reserve-button:hover {
+  background: #303b32;
+  transform: translateY(-1px);
+}
+.hero-reserve-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  transform: none;
+}
+.hero-booking-message {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #846631;
+  padding-top: 14px;
+  margin: 0;
+}
+.hero-booking-message button {
+  margin-right: 12px;
+  color: #624a2b;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.hero-statistics {
+  position: absolute;
+  top: 77%;
+  left: 24%;
+  right: 24%;
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  direction: ltr;
+  z-index: 1;
+}
+.hero-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  flex: 1;
+  min-width: 0;
+  border-radius: 50px;
+  background: #ffffffd6;
+  padding: 13px 19px;
+  box-shadow: 0 7px 35px #39302a05;
+  backdrop-filter: blur(12px);
+}
+.hero-stat > .atelier-icon {
+  height: 32px;
+  width: 32px;
+  color: var(--atelier-gold);
+  stroke-width: 2;
+}
+.hero-stat > .solid-star {
+  fill: currentColor;
+  stroke-width: 1.2;
+}
+.hero-stat > dl {
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  white-space: nowrap;
+  direction: rtl;
+}
+.hero-stat dd {
+  order: -1;
+  font-size: 24px;
+  font-weight: 650;
+  color: #111413;
+  line-height: 1.4;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.hero-stat dt {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #696e71;
+  font-weight: 400;
+}
+.hero-stat-divider {
+  width: 1px;
+  height: 44px;
+  background: #b4b2ad;
+  flex-shrink: 0;
+}
+.hero-signature {
+  position: absolute;
+  right: 3.1%;
+  bottom: 27px;
+  color: #fff;
+  z-index: 2;
+  text-align: right;
+}
+.hero-signature > p {
+  font-family: Vazirmatn, sans-serif;
+  font-weight: 200;
+  font-style: italic;
+  font-size: 25px;
+  line-height: 1.7;
+  margin: 0 0 12px;
+  transform: rotate(-7deg);
+  text-shadow: 0 1px 4px #0005;
+}
+.hero-signature > span {
+  display: block;
+  font:
+    9px/2.3 Arial,
+    sans-serif;
+  letter-spacing: 4px;
+  color: #ffffffae;
+  text-align: center;
+  margin-bottom: 18px;
+}
+.hero-video-trigger {
+  display: flex;
+  direction: ltr;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.hero-video-trigger small {
+  display: block;
+  font-size: 11px;
+  color: #ffffffbc;
+}
+.hero-play-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #b3956c;
+  border-radius: 50%;
+  height: 53px;
+  width: 53px;
+  background: #171c1abb;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+.hero-play-circle .atelier-icon {
+  width: 20px;
+  height: 20px;
+  fill: white;
+  stroke-width: 0;
+  margin-left: 3px;
+}
+.hero-video-trigger:hover .hero-play-circle {
+  background: #292f28;
+  transform: scale(1.06);
+}
+.atelier-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  border: 1px solid #ece6df;
+  border-radius: 22px;
+  background: #fff;
+  color: var(--atelier-black);
+  padding: 25px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: 85svh;
+  overflow: auto;
+  box-shadow: 0 25px 90px #0004;
+}
+.atelier-dialog::backdrop {
+  background: #1219138c;
+  backdrop-filter: blur(7px);
+}
+.dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.dialog-heading h2 {
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0;
+}
+.dialog-close {
+  width: 38px;
+  height: 38px;
+  background: #f4f3f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.dialog-close > .atelier-icon {
+  width: 18px;
+  height: 18px;
+}
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #dad8d2;
+  border-radius: 12px;
+}
+.search-input-wrap input {
+  border: 0;
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  font-size: 15px;
+  outline: none;
+}
+.search-input-wrap:focus-within {
+  outline: 2px solid var(--atelier-gold);
+  outline-offset: 2px;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  margin-top: 15px;
+  max-height: 50svh;
+  overflow: auto;
+}
+.search-results > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 8px;
+  font-size: 14px;
+  border-bottom: 1px solid #f0ece6;
+}
+.search-results > a:hover {
+  color: var(--atelier-gold);
+  background: #faf8f4;
+}
+.search-results .atelier-icon {
+  width: 17px;
+  height: 17px;
+}
+.search-results > p {
+  padding: 20px;
+  color: #717576;
+  font-size: 14px;
+}
+.video-dialog {
+  width: min(880px, calc(100vw - 32px));
+}
+.video-dialog video {
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #171918;
+  border-radius: 12px;
+}
+.video-credit {
+  font-size: 11px;
+  color: #747877;
+  line-height: 1.8;
+  margin-top: 12px;
+}
+.video-credit a {
+  text-decoration: underline;
+}
+.atelier-section {
+  width: 91%;
+  max-width: 1400px;
+  margin: auto;
+  padding: 86px 0;
+  color: var(--atelier-black);
+}
+.atelier-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+.atelier-section-heading p {
+  color: #7f5d30;
+  font-size: 11px;
+  letter-spacing: 3px;
+  margin-bottom: 9px;
+}
+.atelier-section-heading h2 {
+  font-size: 32px;
+  line-height: 1.6;
+  font-weight: 750;
+}
+.atelier-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #6a5437;
+  font-size: 13px;
+  padding: 10px 0;
+}
+.atelier-text-link .atelier-icon {
+  width: 18px;
+  height: 18px;
+}
+.atelier-team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 25px;
+}
+.atelier-team-card {
+  border: 1px solid #e8e3dc;
+  border-radius: 20px;
+  padding: 28px;
+  background: #fff;
+}
+.atelier-team-card-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.atelier-avatar {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3eee6;
+  color: var(--atelier-gold);
+  border: 1px solid #e2d6c3;
+  border-radius: 50%;
+  font-size: 23px;
+  font-weight: 750;
+  flex-shrink: 0;
+}
+.atelier-team-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+}
+.atelier-team-card-top p {
+  font-size: 12px;
+  color: #837354;
+  margin-top: 5px;
+}
+.atelier-team-card > p {
+  font-size: 14px;
+  line-height: 2;
+  color: #737776;
+  margin-top: 18px;
+  min-height: 55px;
+}
+.atelier-team-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #eee8df;
+  padding-top: 15px;
+  margin-top: 20px;
+  gap: 12px;
+}
+.atelier-small-book {
+  padding: 9px 19px;
+  min-height: 40px;
+  border: 1px solid #cbb998;
+  border-radius: 25px;
+  font-size: 12px;
+  color: #715b37;
+  display: flex;
+  align-items: center;
+}
+.atelier-small-book:hover {
+  background: #f6f1e7;
+}
+.atelier-gallery-band {
+  background: #f5f4f0;
+  border-top: 1px solid #ece8e1;
+  border-bottom: 1px solid #ece8e1;
+}
+.atelier-work-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.atelier-work-card {
+  position: relative;
+  aspect-ratio: 4/5;
+  border-radius: 15px;
+  overflow: hidden;
+  background: #ded6c7;
+}
+.atelier-work-card img {
+  object-fit: cover;
+  transition: transform 0.4s;
+}
+.atelier-work-card:hover img {
+  transform: scale(1.035);
+}
+.atelier-work-card figcaption {
+  position: absolute;
+  bottom: 0;
+  inset-inline: 0;
+  padding: 32px 18px 18px;
+  background: linear-gradient(transparent, #111915dc);
+  color: #fff;
+  font-size: 13px;
+}
+.atelier-academy-feature {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 70px;
+  align-items: center;
+}
+.atelier-academy-image {
+  position: relative;
+  aspect-ratio: 4/3;
+  border-radius: 22px;
+  overflow: hidden;
+}
+.atelier-academy-image img {
+  object-fit: cover;
+}
+.atelier-academy-copy > p {
+  font-size: 14px;
+  line-height: 2.2;
+  color: #6c7270;
+  margin: 20px 0;
+}
+.atelier-academy-copy h2 {
+  font-size: 35px;
+  font-weight: 750;
+  line-height: 1.8;
+}
+.atelier-academy-copy > span {
+  color: var(--atelier-gold);
+  font-size: 12px;
+  letter-spacing: 3px;
+}
+.atelier-academy-copy .hero-reserve-button {
+  display: inline-flex;
+  padding: 13px 26px;
+  min-height: 48px;
+  font-size: 14px;
+  border-radius: 30px;
+}
+.atelier-footer {
+  background: #16382b;
+  color: #f2f3ec;
+  border-top: 2px solid #ad8b5145;
+  padding: 65px 4.6% 0;
+  margin-top: 20px;
+  scroll-margin-top: 25px;
+}
+.atelier-footer-content {
+  max-width: 1400px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 70px;
+}
+.atelier-footer .brand-lockup {
+  color: #fff;
+  width: fit-content;
+}
+.atelier-footer p {
+  font-size: 13px;
+  line-height: 2.1;
+  color: #d9e2da;
+  margin-top: 18px;
+  max-width: 380px;
+}
+.atelier-footer h2 {
+  font-size: 14px;
+  color: #ceb17e;
+  font-weight: 650;
+  margin-bottom: 20px;
+}
+.atelier-footer ul {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 13px;
+}
+.atelier-footer li a {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.atelier-footer a:hover {
+  color: #dcc08f;
+}
+.atelier-footer li .atelier-icon {
+  width: 17px;
+  height: 17px;
+  color: #ceb17e;
+}
+.atelier-footer-bottom {
+  max-width: 1400px;
+  border-top: 1px solid #ffffff18;
+  margin: 42px auto 0;
+  padding: 22px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: #bac8be;
+  font-size: 11px;
+}
+.atelier-mobile-bottom {
+  display: none;
+}
+.atelier-header :is(a, button, summary):focus-visible,
+.atelier-hero :is(a, button, select, input):focus-visible,
+.atelier-dialog :is(a, button, input):focus-visible,
+.atelier-mobile-bottom a:focus-visible {
+  outline: 2px solid #946c35;
+  outline-offset: 4px;
+}
+.atelier-hero select:focus-visible,
+.atelier-hero input:focus-visible {
+  outline: 0;
+}
+@media (min-width: 1600px) {
+  .hero-copy {
+    top: 9.5%;
+  }
+  .hero-promises {
+    margin-top: 42px;
+    font-size: 16px;
+    max-width: 640px;
+  }
+  .hero-booking-tabs {
+    width: 455px;
+    height: 68px;
+  }
+  .hero-booking-panel {
+    padding: 38px 30px 40px;
+  }
+  .hero-field-control {
+    height: 58px;
+  }
+  .hero-field-label {
+    font-size: 17px;
+  }
+  .hero-field-control select {
+    font-size: 16px;
+  }
+  .hero-reserve-button {
+    height: 73px;
+    font-size: 23px;
+  }
+  .hero-stat {
+    padding: 15px 24px;
+  }
+  .hero-stat dd {
+    font-size: 27px;
+  }
+  .hero-stat dt {
+    font-size: 15px;
+  }
+}
+@media (max-width: 1199px) {
+  .atelier-nav {
+    width: 93%;
+    gap: 15px;
+  }
+  .brand-wordmark > span {
+    font-size: 21px;
+    letter-spacing: 3.5px;
+  }
+  .brand-monogram {
+    width: 32px;
+    height: 43px;
+  }
+  .brand-lockup {
+    gap: 10px;
+  }
+  .atelier-nav-links {
+    gap: 22px;
+    font-size: 14px;
+  }
+  .atelier-header-actions {
+    gap: 10px;
+  }
+  .header-account {
+    padding: 10px 17px;
+    font-size: 13px;
+  }
+  .hero-copy {
+    width: 49%;
+    left: 4%;
+    top: 10%;
+  }
+  .hero-copy h1 {
+    font-size: 4.9vw;
+    letter-spacing: -2px;
+  }
+  .hero-description {
+    font-size: 1.48vw;
+    white-space: normal;
+  }
+  .hero-promises {
+    font-size: 12px;
+    gap: 10px;
+    margin-top: 29px;
+  }
+  .hero-promises .atelier-icon {
+    width: 21px;
+    height: 21px;
+  }
+  .hero-promises li {
+    gap: 8px;
+  }
+  .hero-promises li + li {
+    padding-left: 14px;
+  }
+  .hero-booking-position {
+    left: 4%;
+    right: 4%;
+    top: 46%;
+  }
+  .hero-booking-grid {
+    gap: 13px;
+    grid-template-columns: 1.15fr 1fr 1fr 0.9fr 0.85fr;
+  }
+  .hero-booking-panel {
+    padding: 31px 23px 35px;
+  }
+  .hero-field-control select {
+    font-size: 12px;
+    padding-right: 35px;
+    padding-left: 25px;
+  }
+  .hero-field-control > .atelier-icon:first-child {
+    width: 20px;
+    height: 20px;
+    right: 9px;
+  }
+  .hero-field-control .field-chevron {
+    left: 9px;
+    width: 12px;
+  }
+  .hero-reserve-button {
+    font-size: 17px;
+    gap: 11px;
+    min-height: 58px;
+  }
+  .hero-statistics {
+    left: 19%;
+    right: 22%;
+    gap: 14px;
+    top: 79%;
+  }
+  .hero-stat {
+    gap: 12px;
+    padding: 12px 16px;
+  }
+  .hero-stat dt {
+    font-size: 11px;
+  }
+  .hero-stat dd {
+    font-size: 22px;
+  }
+  .hero-stat > .atelier-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .hero-signature {
+    right: 3%;
+    bottom: 26px;
+  }
+  .hero-signature > p {
+    font-size: 21px;
+  }
+  .hero-signature > span {
+    font-size: 8px;
+    letter-spacing: 3px;
+  }
+  .hero-video-trigger {
+    font-size: 11px;
+    gap: 10px;
+  }
+  .hero-play-circle {
+    width: 45px;
+    height: 45px;
+  }
+  .hero-video-trigger small {
+    font-size: 10px;
+  }
+}
+@media (max-width: 959px) {
+  :root {
+    --atelier-header-height: 72px;
+  }
+  .atelier-nav-links {
+    display: none;
+  }
+  .atelier-mobile-menu {
+    display: block;
+  }
+  .atelier-header-actions {
+    gap: 14px;
+  }
+  .atelier-hero {
+    height: 850px;
+    min-height: 850px;
+  }
+  .hero-copy {
+    top: 8%;
+    width: 53%;
+    left: 4%;
+  }
+  .hero-copy h1 {
+    font-size: 5.3vw;
+    letter-spacing: -1.5px;
+  }
+  .hero-description {
+    font-size: 16px;
+    line-height: 2;
+  }
+  .hero-eyebrow {
+    font-size: 12px;
+    margin-bottom: 22px;
+  }
+  .hero-promises {
+    gap: 12px;
+    justify-content: start;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .hero-promises li + li {
+    border: none;
+    padding-left: 0;
+  }
+  .hero-promises li {
+    font-size: 12px;
+  }
+  .hero-light-wash {
+    background:
+      linear-gradient(90deg, #fff9, #fff7 35%, transparent 68%),
+      radial-gradient(
+        ellipse 75% 45% at 40% 100%,
+        #fff 12%,
+        #ffffffdf 45%,
+        transparent 90%
+      );
+  }
+  .hero-booking-position {
+    top: 43%;
+    left: 4%;
+    right: 4%;
+  }
+  .hero-booking-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 17px;
+  }
+  .hero-reserve-button {
+    grid-column: 1/-1;
+    justify-self: start;
+    min-width: 180px;
+    min-height: 51px;
+    margin-top: 2px;
+  }
+  .hero-booking-panel {
+    padding: 25px;
+  }
+  .hero-statistics {
+    top: 81%;
+    left: 5%;
+    right: 24%;
+    gap: 12px;
+  }
+  .hero-stat {
+    padding: 10px 12px;
+    gap: 9px;
+  }
+  .hero-stat > .atelier-icon {
+    width: 25px;
+    height: 25px;
+  }
+  .hero-signature > p {
+    display: none;
+  }
+  .hero-signature {
+    bottom: 25px;
+    right: 4%;
+  }
+  .hero-signature > span {
+    display: none;
+  }
+  .hero-stat-divider {
+    height: 35px;
+  }
+  .atelier-team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .atelier-team-card:last-child:nth-child(odd) {
+    grid-column: 1/-1;
+  }
+  .atelier-work-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .atelier-academy-feature {
+    gap: 35px;
+  }
+  .atelier-academy-copy h2 {
+    font-size: 28px;
+  }
+  .atelier-footer-content {
+    gap: 30px;
+    grid-template-columns: 1.2fr 1fr 1fr;
+  }
+}
+@media (max-width: 639px) {
+  :root {
+    --atelier-header-height: 68px;
+  }
+  .atelier-nav {
+    width: 92%;
+    gap: 12px;
+  }
+  .brand-monogram {
+    width: 28px;
+    height: 38px;
+  }
+  .brand-wordmark > span {
+    font-size: 19px;
+    letter-spacing: 3.2px;
+  }
+  .brand-wordmark small {
+    font-size: 5.5px;
+    letter-spacing: 0.95px;
+  }
+  .brand-lockup {
+    gap: 9px;
+  }
+  .header-account {
+    display: none;
+  }
+  .atelier-header-actions {
+    gap: 5px;
+  }
+  .header-search,
+  .atelier-mobile-menu summary {
+    width: 37px;
+    height: 40px;
+  }
+  .header-search .atelier-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .atelier-hero {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 305px 0 85px;
+    overflow: clip;
+    background: #f9f8f5;
+  }
+  .atelier-hero .atelier-hero-photo {
+    height: 445px !important;
+    object-position: 73% center;
+    object-fit: cover;
+    z-index: -3;
+  }
+  .hero-light-wash {
+    height: 480px;
+    background: linear-gradient(
+      to bottom,
+      transparent 28%,
+      #faf9f654 51%,
+      #faf9f6ed 78%,
+      #faf9f6 94%
+    );
+  }
+  .hero-copy {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    margin: 0 5.5%;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    justify-content: center;
+    margin-bottom: 14px;
+    font-size: 11px;
+    gap: 10px;
+    color: #73716c;
+  }
+  .hero-eyebrow > span:first-child,
+  .hero-eyebrow > span:last-child {
+    width: 28px;
+    background: #b4ab9b;
+  }
+  .hero-copy h1 {
+    font-size: clamp(32px, 8.5vw, 47px);
+    letter-spacing: -1.4px;
+    line-height: 1.75;
+    white-space: normal;
+  }
+  .hero-description {
+    font-size: 13px;
+    line-height: 2.1;
+    max-width: 330px;
+    margin: 10px auto 0;
+    color: #575953;
+  }
+  .hero-promises {
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 15px;
+    margin: 25px auto 30px;
+    font-size: 10px;
+  }
+  .hero-promises li {
+    font-size: 10px;
+    gap: 5px;
+    flex-direction: column;
+  }
+  .hero-promises .atelier-icon {
+    width: 22px;
+    height: 22px;
+  }
+  .hero-promises li + li {
+    padding-left: 12px;
+    border-left: 1px solid #d3caba;
+  }
+  .hero-booking-position {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    width: 90%;
+    margin: 0 auto;
+  }
+  .hero-booking-tabs {
+    width: 295px;
+    max-width: 89%;
+    height: 56px;
+  }
+  .hero-booking-tab {
+    font-size: 13px;
+    gap: 10px;
+    padding: 0 9px 4px;
+  }
+  .hero-booking-tab .atelier-icon {
+    height: 21px;
+    width: 21px;
+  }
+  .hero-booking-tab::before {
+    border-radius: 20px 20px 0 0;
+  }
+  .hero-booking-panel {
+    border-radius: 22px;
+    padding: 24px 18px;
+    background: #fffc;
+    box-shadow: 0 15px 35px #46341510;
+  }
+  .hero-booking-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
+  }
+  .hero-field-label {
+    font-size: 12px;
+    padding-right: 8px;
+  }
+  .hero-field-control {
+    height: 49px;
+    border-radius: 11px;
+  }
+  .hero-field-control select {
+    font-size: 11px;
+    padding-right: 30px;
+    padding-left: 20px;
+  }
+  .hero-field-control input[readonly] {
+    font-size: 11px;
+    padding-right: 30px;
+    padding-left: 20px;
+  }
+  .hero-field-control > .atelier-icon:first-child {
+    right: 8px;
+    width: 18px;
+    height: 18px;
+  }
+  .hero-field-control .field-chevron {
+    left: 6px;
+    width: 11px;
+    height: 11px;
+  }
+  .hero-reserve-button {
+    width: 100%;
+    min-height: 54px;
+    margin-top: 3px;
+    font-size: 17px;
+    border-radius: 13px;
+  }
+  .hero-booking-message {
+    font-size: 11px;
+  }
+  .hero-statistics {
+    position: relative;
+    inset: auto;
+    gap: 10px;
+    direction: ltr;
+    margin: 30px 5% 0;
+  }
+  .hero-stat {
+    padding: 14px 6px;
+    gap: 5px;
+    flex-direction: column;
+    box-shadow: none;
+    background: #fffd;
+    border: 1px solid #efebe4;
+    border-radius: 16px;
+  }
+  .hero-stat > .atelier-icon {
+    width: 23px;
+    height: 23px;
+  }
+  .hero-stat dd {
+    font-size: 20px;
+    line-height: 1.8;
+  }
+  .hero-stat dt {
+    font-size: 10px;
+  }
+  .hero-stat-divider {
+    display: none;
+  }
+  .hero-signature {
+    right: 6%;
+    top: 201px;
+    bottom: auto;
+  }
+  .hero-video-trigger {
+    direction: ltr;
+    gap: 8px;
+    background: #192219bd;
+    padding: 5px 11px 5px 5px;
+    border-radius: 30px;
+    font-size: 10px;
+    backdrop-filter: blur(6px);
+  }
+  .hero-play-circle {
+    width: 35px;
+    height: 35px;
+  }
+  .hero-play-circle .atelier-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .hero-video-trigger small {
+    font-size: 9px;
+  }
+  .atelier-section {
+    padding: 52px 0;
+    width: 90%;
+  }
+  .atelier-section-heading {
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 25px;
+  }
+  .atelier-section-heading h2 {
+    font-size: 23px;
+  }
+  .atelier-section-heading p {
+    font-size: 9px;
+  }
+  .atelier-section-heading > .atelier-text-link {
+    font-size: 11px;
+    white-space: nowrap;
+    gap: 7px;
+  }
+  .atelier-team-grid {
+    grid-template-columns: 1fr;
+    gap: 17px;
+  }
+  .atelier-team-card {
+    padding: 23px;
+  }
+  .atelier-team-card:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+  .atelier-team-card h3 {
+    font-size: 18px;
+  }
+  .atelier-team-card > p {
+    font-size: 13px;
+    min-height: 0;
+  }
+  .atelier-work-grid {
+    gap: 12px;
+  }
+  .atelier-work-card {
+    border-radius: 12px;
+  }
+  .atelier-work-card figcaption {
+    font-size: 11px;
+    padding: 30px 10px 12px;
+  }
+  .atelier-academy-feature {
+    grid-template-columns: 1fr;
+    gap: 27px;
+  }
+  .atelier-academy-copy h2 {
+    font-size: 26px;
+  }
+  .atelier-academy-copy > p {
+    font-size: 13px;
+  }
+  .atelier-footer {
+    padding: 42px 6% 90px;
+    margin-top: 0;
+  }
+  .atelier-footer-content {
+    grid-template-columns: 1fr 1fr;
+    gap: 35px;
+  }
+  .atelier-footer-content > div:first-child {
+    grid-column: 1/-1;
+  }
+  .atelier-footer ul {
+    font-size: 12px;
+    gap: 16px;
+  }
+  .atelier-footer p {
+    font-size: 12px;
+  }
+  .atelier-footer h2 {
+    font-size: 13px;
+  }
+  .atelier-footer-bottom {
+    margin-top: 30px;
+    flex-direction: column;
+    font-size: 10px;
+    gap: 9px;
+    padding-bottom: 0;
+  }
+  .atelier-mobile-bottom {
+    position: fixed;
+    inset-inline: 12px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 45;
+    display: block;
+    border: 1px solid #e5e0d6;
+    border-radius: 22px;
+    background: #fffffff0;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 5px 25px #2b201b17;
+  }
+  .atelier-mobile-bottom ul {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    min-height: 64px;
+    padding: 5px 6px;
+    gap: 3px;
+  }
+  .atelier-mobile-bottom a {
+    min-width: 48px;
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 9px;
+    color: #797b78;
+  }
+  .atelier-mobile-bottom .atelier-icon {
+    width: 19px;
+    height: 19px;
+  }
+  .atelier-mobile-bottom .mobile-book {
+    background: #1b211e;
+    color: #e0c49a;
+    min-width: 62px;
+    border-radius: 16px;
+    padding: 6px 12px;
+  }
+  .atelier-dialog {
+    padding: 18px;
+  }
+  .dialog-heading h2 {
+    font-size: 17px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .atelier-hero *,
+  .atelier-work-card img,
+  .hero-play-circle {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
