@@ -17,7 +17,7 @@ export function DashboardShell({
 }) {
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#fdfcf9] text-bone">
+      <div className="theme-ops min-h-screen bg-[#fdfcf9] text-bone">
         <header className="glass-floating sticky top-0 z-30 border-b border-[#c59b4b]/20">
           <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
             <div className="flex items-center gap-3">

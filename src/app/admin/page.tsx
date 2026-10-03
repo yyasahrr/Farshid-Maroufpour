@@ -1,17 +1,26 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appointments,
   auditLogs,
+  barberSkills,
   barbers,
+  blockedTimes,
+  bookingHolds,
   classRegistrations,
+  classSessions,
   classes,
   notifications,
   salonSchedule,
+  serviceCombinationRules,
   services,
+  skills,
+  userRoles,
+  users,
 } from "@/db/schema";
+import { LiveSalonTimeline, type TimelineBlock, type TimelineRow } from "@/components/admin/live-salon-timeline";
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
 import { ActionForm, Field } from "@/components/action-form";
 import { BookingFlow } from "@/components/booking-flow";
@@ -23,27 +32,56 @@ import {
   createBarberAction,
   createClassAction,
   createServiceAction,
+  decideSkillAction,
+  deleteCombinationRuleAction,
   setSalonHoursAction,
+  setRoleMembershipAction,
   updateAppointmentStatusAction,
+  upsertCombinationRuleAction,
 } from "@/lib/actions/salon";
-import { WEEKDAY_LABELS, formatPersianDate, formatPrice, isValidISODate, minutesToLabel, todayISO } from "@/lib/time";
+import {
+  WEEKDAY_LABELS,
+  currentEpochMs,
+  formatPersianDate,
+  formatPrice,
+  isValidISODate,
+  minutesToLabel,
+  salonMinuteOfDay,
+  todayISO,
+} from "@/lib/time";
+import type { Permission } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
 const SECTIONS = [
+  { id: "live", label: "Live Salon" },
   { id: "notifications", label: "اعلان‌ها" },
   { id: "calendar", label: "تقویم روز" },
   { id: "walkin", label: "پذیرش حضوری" },
   { id: "clients", label: "بانک مشتریان" },
   { id: "team", label: "مدیریت تیم" },
+  { id: "skills", label: "تأیید مهارت‌ها" },
+  { id: "combos", label: "قوانین ترکیب خدمات" },
   { id: "services", label: "سرویس‌ها" },
   { id: "hours", label: "ساعات سالن" },
   { id: "academy", label: "آکادمی" },
+  { id: "roles", label: "دسترسی‌ها و نقش‌ها" },
   { id: "audit", label: "لاگ سیستم" },
 ];
+const ROLE_LABEL_FA: Record<string, string> = {
+  CLIENT: "مشتری",
+  TRAINEE: "هنرجو",
+  BARBER: "آرایشگر",
+  INSTRUCTOR: "مدرس",
+  RECEPTIONIST: "پذیرش",
+  MANAGER: "مدیر",
+  FINANCE: "مالی",
+  SUPER_ADMIN: "مالک / مدیر ارشد",
+};
 
 const STATUS_FA: Record<string, string> = {
-  PENDING: "در انتظار",
+  PENDING: "در انتظار پرداخت",
+  AWAITING_APPROVAL: "در انتظار تأیید مدیر",
   CONFIRMED: "تأیید شده",
   CHECKED_IN: "حاضر شد",
   IN_PROGRESS: "در حال انجام",
@@ -60,14 +98,26 @@ export default async function AdminDashboard({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!isStaff(user.role)) redirect("/barber");
-  const isSuper = user.role === "SUPER_ADMIN";
+  if (!isStaff(user)) redirect("/barber");
+  const can = (permission: Permission) => user.permissions.has(permission);
+  const isSuper = user.roles.includes("SUPER_ADMIN");
+  const canManageServices = can("services:manage");
+  const canApproveSkills = can("skills:approve");
+  const canManageRoles = can("roles:manage");
+  const canManageAcademy = can("academy:manage");
+  const sections = SECTIONS.filter((section) => {
+    if (section.id === "skills") return canApproveSkills;
+    if (section.id === "combos" || section.id === "services") return canManageServices;
+    if (section.id === "roles" || section.id === "audit") return can("audit:view") || canManageRoles;
+    return true;
+  });
 
   const sp = await searchParams;
   const date = sp.date && isValidISODate(sp.date) ? sp.date : todayISO();
   const barberFilter = Number(sp.barber) > 0 ? Number(sp.barber) : null;
 
-  const [dayRows, barberRows, serviceRows, hours, classRows, registrations, logs, clientRows, booking] =
+  const [dayRows, barberRows, serviceRows, hours, classRows, registrations, logs, clientRows, booking,
+      holdsToday, sessionsToday, blocksToday, pendingSkills, ruleRows, roster] =
     await Promise.all([
       db
         .select({ a: appointments, barberName: barbers.name, serviceName: services.name })
@@ -103,9 +153,138 @@ export default async function AdminDashboard({
         .orderBy(desc(sql`max(${appointments.date})`))
         .limit(8),
       loadBookingData(),
+      db
+        .select({
+          id: bookingHolds.id,
+          barberId: bookingHolds.barberId,
+          date: bookingHolds.date,
+          startMin: bookingHolds.startMin,
+          durationMin: bookingHolds.durationMin,
+          planId: bookingHolds.planId,
+          clientPhone: bookingHolds.clientPhone,
+          expiresAt: bookingHolds.expiresAt,
+        })
+        .from(bookingHolds)
+        .where(and(eq(bookingHolds.date, date), gt(bookingHolds.expiresAt, new Date()))),
+      db
+        .select({ s: classSessions, instructorBarberId: classes.instructorBarberId, title: classes.title })
+        .from(classSessions)
+        .innerJoin(classes, eq(classes.id, classSessions.classId))
+        .where(eq(classSessions.date, date)),
+      db.select().from(blockedTimes).where(eq(blockedTimes.date, date)),
+      db
+        .select({
+          id: barberSkills.id,
+          barberId: barberSkills.barberId,
+          barberName: barbers.name,
+          skillName: skills.name,
+          status: barberSkills.status,
+        })
+        .from(barberSkills)
+        .innerJoin(barbers, eq(barbers.id, barberSkills.barberId))
+        .innerJoin(skills, eq(skills.id, barberSkills.skillId))
+        .where(eq(barberSkills.status, "PENDING")),
+      db
+        .select({
+          id: serviceCombinationRules.id,
+          a: serviceCombinationRules.serviceAId,
+          b: serviceCombinationRules.serviceBId,
+          canCombine: serviceCombinationRules.canCombine,
+          sameBarberRequired: serviceCombinationRules.sameBarberRequired,
+          note: serviceCombinationRules.note,
+          nameA: services.name,
+        })
+        .from(serviceCombinationRules)
+        .innerJoin(services, eq(services.id, serviceCombinationRules.serviceAId)),
+      db
+        .select({ id: users.id, name: users.name, phone: users.phone, role: userRoles.role })
+        .from(users)
+        .leftJoin(userRoles, and(eq(userRoles.userId, users.id)))
+        .orderBy(users.id),
     ]);
 
   const sorted = dayRows.sort((x, y) => x.a.startMin - y.a.startMin);
+
+  /* ---- Live Salon timeline model: one block per VISIT (group), one row per staff ---- */
+  const TL_START = 9 * 60;
+  const TL_END = 23 * 60;
+  const nowMin = date === todayISO() ? salonMinuteOfDay() : null;
+  const holdCutoffMs = currentEpochMs();
+  const timelineRows: TimelineRow[] = barberRows
+    .filter((b) => b.active)
+    .map((b) => {
+      const blocks: TimelineBlock[] = [];
+      const my = sorted.filter((r) => r.a.barberId === b.id);
+      const byGroup = new Map<string, typeof my>();
+      const singles: typeof my = [];
+      for (const r of my) {
+        if (r.a.bookingGroupId) {
+          const list = byGroup.get(r.a.bookingGroupId) ?? [];
+          list.push(r);
+          byGroup.set(r.a.bookingGroupId, list);
+        } else singles.push(r);
+      }
+      for (const group of byGroup.values()) {
+        const start = Math.min(...group.map((g) => g.a.startMin));
+        const end = Math.max(...group.map((g) => g.a.endMin));
+        const pending = group.some((g) => g.a.status === "PENDING" || g.a.status === "AWAITING_APPROVAL");
+        blocks.push({
+          kind: pending ? "PENDING" : "BOOKING",
+          startMin: start,
+          endMin: end,
+          title: `${group[0].a.clientName} — ${group.map((g) => g.serviceName).join(" + ")}`,
+          meta: `${minutesToLabel(start)}–${minutesToLabel(end)} · ${group.length} خدمت`,
+          segments: group.map((g) => ({ title: g.serviceName, startMin: g.a.startMin, endMin: g.a.endMin })),
+        });
+      }
+      for (const r of singles) {
+        const pending = r.a.status === "PENDING" || r.a.status === "AWAITING_APPROVAL";
+        blocks.push({
+          kind: pending ? "PENDING" : "BOOKING",
+          startMin: r.a.startMin,
+          endMin: Math.max(r.a.endMin, r.a.barberEndMin),
+          title: `${r.a.clientName} — ${r.serviceName}`,
+          meta: `${minutesToLabel(r.a.startMin)}–${minutesToLabel(r.a.endMin)} · ${STATUS_FA[r.a.status] ?? r.a.status}`,
+        });
+      }
+      const myHolds = holdsToday.filter((h) => h.barberId === b.id);
+      const holdGroups = new Map<string, typeof myHolds>();
+      for (const h of myHolds) {
+        const key = h.planId ?? `single-${h.id}`;
+        holdGroups.set(key, [...(holdGroups.get(key) ?? []), h]);
+      }
+      for (const hold of holdGroups.values()) {
+        const start = Math.min(...hold.map((h) => h.startMin));
+        const end = Math.max(...hold.map((h) => h.startMin + Math.max(h.durationMin, 30)));
+        const minutesLeft = Math.max(0, Math.round((new Date(hold[0].expiresAt).getTime() - holdCutoffMs) / 60_000));
+        blocks.push({ kind: "HOLD", startMin: start, endMin: end, title: "نگهداری موقت مشتری", meta: `${minutesToLabel(start)} تا ${minutesToLabel(end)} · ${minutesLeft.toLocaleString("fa-IR")} دقیقه مانده` });
+      }
+      for (const session of sessionsToday.filter((x) => x.instructorBarberId === b.id)) {
+        blocks.push({ kind: "CLASS", startMin: session.s.startMin, endMin: session.s.endMin + session.s.bufferMin, title: `کلاس: ${session.title}`, meta: "ظرفیت آموزشی — نوبت سالن مسدود است" });
+      }
+      for (const block of blocksToday.filter((x) => x.barberId === b.id)) {
+        blocks.push({ kind: block.fullDay ? "BLOCK" : "BREAK", startMin: block.startMin, endMin: block.endMin, title: block.reason, meta: block.fullDay ? "روز تعطیل/مرخصی" : undefined });
+      }
+      return { id: b.id, name: b.name, role: b.title, blocks };
+    });
+  const holdingPlans = new Set(holdsToday.map((h) => h.planId ?? `single-${h.id}`)).size;
+  const awaitingRows = sorted.filter((r) => r.a.status === "AWAITING_APPROVAL" || r.a.status === "PENDING");
+  const workingMinutes = timelineRows.reduce((sum, row) => sum + 12 * 60, 0);
+  const bookedMinutes = timelineRows.reduce(
+    (sum, row) => sum + row.blocks.filter((x) => x.kind === "BOOKING" || x.kind === "PENDING").reduce((s2, x) => s2 + (x.endMin - x.startMin), 0),
+    0,
+  );
+  const capacityPct = workingMinutes > 0 ? Math.round((bookedMinutes / workingMinutes) * 100) : 0;
+  const rosterRows = (() => {
+    const map = new Map<number, { name: string; phone: string; roles: string[] }>();
+    for (const r of roster) {
+      const current = map.get(r.id) ?? { name: r.name, phone: r.phone, roles: [] };
+      if (r.role) current.roles.push(r.role);
+      map.set(r.id, current);
+    }
+    return [...map.entries()].map(([id, v]) => ({ id, ...v }));
+  })();
+  const allServiceOptions = serviceRows.filter((x) => x.active);
   const revenue = sorted
     .filter((r) => r.a.status === "COMPLETED")
     .reduce((sum, r) => sum + r.a.priceSnapshot, 0);
@@ -130,7 +309,7 @@ export default async function AdminDashboard({
   }));
 
   return (
-    <DashboardShell title="پنل مدیریت سالن" subtitle={`${user.name} · ${isSuper ? "مدیر ارشد" : "پذیرش"}`} sections={SECTIONS}>
+    <DashboardShell title="پنل مدیریت سالن" subtitle={`${user.name} · ${user.roles.map((r) => ROLE_LABEL_FA[r] ?? r).join(" + ")}`} sections={sections}>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="نوبت‌های تقویم امروز" value={sorted.length} hint={formatPersianDate(date)} />
         <StatCard
@@ -168,6 +347,13 @@ export default async function AdminDashboard({
 
       <Panel id="notifications" title="اعلان‌های مدیریتی و رزروها">
         <NotificationList items={notificationItems} />
+      </Panel>
+
+      <Panel id="live" title="Live Salon — خط زمان عملیاتی" description={`نمایش زندهٔ ${formatPersianDate(date)}؛ هر میله یک نوبت کامل است، حتی اگر چند خدمت و چند پرسنل داشته باشد.`}>
+        <LiveSalonTimeline rows={timelineRows} gridStartMin={TL_START} gridEndMin={TL_END} slotMin={30} nowMin={nowMin} />
+        <p className="mt-3 text-[11px] text-bone/50">
+          میلهٔ خط‌چین زرد یا قرمز یعنی پرداخت/تأیید نهایی نشده؛ میلهٔ خط‌چین سبز، Hold فعال مشتری است (کل برنامه قفل شده، نه یک اسلات).
+        </p>
       </Panel>
 
       <Panel id="calendar" title="تقویم متمرکز روزانه سالن" description={formatPersianDate(date)}>
@@ -323,7 +509,7 @@ export default async function AdminDashboard({
             </li>
           ))}
         </ul>
-        {isSuper && (
+        {can("staff:manage") && (
           <div className="rounded-2xl border border-[#c59b4b]/30 bg-white/80 p-5">
             <h3 className="text-sm font-bold text-[#0f5a3b]">افزودن آرایشگر جدید به سالن</h3>
             <ActionForm action={createBarberAction} submitLabel="ایجاد پرونده آرایشگر" className="mt-3">
@@ -352,7 +538,7 @@ export default async function AdminDashboard({
             </li>
           ))}
         </ul>
-        {isSuper && (
+        {canManageServices && (
           <div className="rounded-2xl border border-[#c59b4b]/30 bg-white/80 p-5">
             <h3 className="text-sm font-bold text-[#0f5a3b]">تعریف سرویس جدید سالن</h3>
             <ActionForm action={createServiceAction} submitLabel="ایجاد سرویس جدید" className="mt-3">
@@ -424,7 +610,7 @@ export default async function AdminDashboard({
             </li>
           ))}
         </ul>
-        {isSuper && (
+        {canManageAcademy && (
           <div className="mt-6 rounded-2xl border border-[#c59b4b]/30 bg-white/80 p-5">
             <h3 className="text-sm font-bold text-[#0f5a3b]">تعریف دوره جدید در آکادمی</h3>
             <ActionForm action={createClassAction} submitLabel="ثبت دوره جدید" className="mt-3">
@@ -471,6 +657,120 @@ export default async function AdminDashboard({
           </div>
         )}
       </Panel>
+
+      {canApproveSkills && (
+        <Panel id="skills" title="صف تأیید مهارت‌ها" description="مهارت اعلامی آرایشگر تا تأیید مدیریت در زمان‌بندی استفاده نمی‌شود.">
+          {pendingSkills.length === 0 ? (
+            <p className="text-sm text-bone/55">درخواست در انتظار تأییدی وجود ندارد.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {pendingSkills.map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c59b4b]/20 bg-white/70 p-3">
+                  <span>
+                    <b className="text-bone">{row.barberName}</b>
+                    <span className="mr-2 text-[#855e16]">ادعای مهارت «{row.skillName}»</span>
+                  </span>
+                  <span className="flex gap-2">
+                    <ActionForm action={decideSkillAction} submitLabel="تأیید" className="contents">
+                      <input type="hidden" name="membershipId" value={row.id} />
+                      <input type="hidden" name="decision" value="APPROVE" />
+                    </ActionForm>
+                    <ActionForm action={decideSkillAction} submitLabel="رد" className="contents">
+                      <input type="hidden" name="membershipId" value={row.id} />
+                      <input type="hidden" name="decision" value="REJECT" />
+                    </ActionForm>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+      )}
+
+      {canManageServices && (
+        <Panel id="combos" title="قوانین ترکیب خدمات" description="دیتامحور: رزرو چندخدمتی روی همین ماتریس اعتبارسنجی می‌شود؛ UI فقط بازتاب آن است.">
+          <ul className="mb-4 space-y-2 text-xs">
+            {ruleRows.length === 0 && <li className="text-bone/50">هنوز قانونی ثبت نشده؛ جفت‌های بدون قانون = ترکیب آزاد.</li>}
+            {ruleRows.map((rule) => (
+              <li key={rule.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c59b4b]/20 bg-white/70 p-3 text-sm">
+                <span className="font-semibold text-bone">
+                  {rule.nameA}
+                  <span className="mx-1 text-bone/50">↔</span>
+                  {serviceRows.find((x) => x.id === rule.b)?.name ?? `سرویس ${rule.b}`}
+                </span>
+                <span className="flex items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 font-bold ${rule.canCombine ? "bg-[#e4ece3] text-[#2f4a3a]" : "bg-rose-50 text-rose-700"}`}>
+                    {rule.canCombine ? "قابل ترکیب" : "غیرقابل ترکیب"}
+                  </span>
+                  {rule.sameBarberRequired && <span className="rounded-full bg-[#f7f0d8] px-2 py-0.5 font-bold text-[#6b5213]">یک آرایشگر</span>}
+                  {rule.note && <span className="max-w-[220px] truncate text-[#855e16]" title={rule.note}>{rule.note}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="rounded-2xl border border-[#c59b4b]/30 bg-white/80 p-5">
+            <h3 className="text-sm font-bold text-[#0f5a3b]">ثبت/ویرایش قانون برای یک جفت خدمت</h3>
+            <ActionForm action={upsertCombinationRuleAction} submitLabel="ذخیره قانون" className="mt-3">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div>
+                  <label htmlFor="combo-a" className="text-[11px] font-semibold text-bone/65">خدمت اول</label>
+                  <select id="combo-a" name="serviceAId" className="focus-ring mt-1 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs font-semibold">
+                    {allServiceOptions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="combo-b" className="text-[11px] font-semibold text-bone/65">خدمت دوم</label>
+                  <select id="combo-b" name="serviceBId" className="focus-ring mt-1 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs font-semibold">
+                    {allServiceOptions.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-bold text-[#855e16]">
+                  <input type="checkbox" name="canCombine" defaultChecked className="focus-ring h-4 w-4" />
+                  قابل ترکیب
+                </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-[#855e16]">
+                  <input type="checkbox" name="sameBarberRequired" className="focus-ring h-4 w-4" />
+                  باید یک آرایشگر انجام دهد
+                </label>
+                <div className="sm:col-span-4">
+                  <Field label="دلیل نمایشی برای مشتری (در صورت عدم امکان ترکیب)" name="note" required={false} />
+                </div>
+              </div>
+            </ActionForm>
+          </div>
+        </Panel>
+      )}
+
+      {canManageRoles && (
+        <Panel id="roles" title="نقش‌ها و دسترسی‌ها" description="مدل چندنقشی: هر کاربر مجموعه‌ای از نقش‌ها دارد؛ دسترسی از همین جدول ساخته می‌شود، نه یک ستون یکتا.">
+          <ul className="space-y-2 text-sm">
+            {rosterRows.map((person) => (
+              <li key={person.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#c59b4b]/20 bg-white/70 p-3">
+                <span className="min-w-0">
+                  <b className="text-bone">{person.name}</b>
+                  <span dir="ltr" className="mr-2 font-mono text-xs text-bone/50">{person.phone}</span>
+                  <span className="mt-1 flex flex-wrap gap-1">
+                    {person.roles.length ? person.roles.map((role) => (
+                      <span key={role} className="rounded-full bg-[#e2efe8] px-2 py-0.5 text-[10px] font-bold text-[#2f4a3a]">
+                        {ROLE_LABEL_FA[role] ?? role}
+                      </span>
+                    )) : <span className="text-[10px] text-bone/45">بدون عضویت — از نقش قدیمی استفاده می‌شود</span>}
+                  </span>
+                </span>
+                <form className="flex items-center gap-2 text-xs" action={setRoleMembershipAction as unknown as (formData: FormData) => Promise<void>}>
+                  <label htmlFor={`role-${person.id}`} className="sr-only">نقش برای {person.name}</label>
+                  <select id={`role-${person.id}`} name="role" className="focus-ring rounded-xl border border-[#c59b4b]/30 bg-white px-2 py-1.5 font-semibold">
+                    {Object.entries(ROLE_LABEL_FA).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  <input type="hidden" name="userId" value={person.id} />
+                  <button type="submit" name="action" value="GRANT" className="focus-ring rounded-full bg-[#0f5a3b] px-3 py-1 font-bold text-white">اعطا</button>
+                  <button type="submit" name="action" value="REVOKE" className="focus-ring rounded-full border border-rose-300 px-3 py-1 font-bold text-rose-700">برداشتن</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       <Panel id="audit" title="لاگ حسابرسی و رویدادهای سیستمی">
         <ul className="space-y-2 text-xs">

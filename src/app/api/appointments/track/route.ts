@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const code = !isPhone && /^\d{1,10}$/.test(q) ? Number(q) : NaN;
   const isId = Number.isSafeInteger(code) && code > 0 && code <= 2147483647;
   if (!isPhone && !isId) return NextResponse.json({ error: "شماره ۱۱رقمی یا کد رهگیری عددی وارد کنید." }, { status: 400 });
-  const staff = isStaff(user.role);
+  const staff = isStaff(user);
   if (isPhone && q !== user.phone && !staff) return NextResponse.json({ error: "به این نوبت‌ها دسترسی ندارید." }, { status: 403 });
   try {
     const own = staff ? undefined : eq(appointments.clientPhone, user.phone);

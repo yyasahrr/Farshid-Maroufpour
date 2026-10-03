@@ -12,7 +12,7 @@ export const metadata = { title: "ورود به پنل کارکنان" };
  */
 export default async function LoginPage() {
   const user = await getCurrentUser();
-  if (user) redirect(landingPathFor(user.role));
+  if (user) redirect(landingPathFor(user));
 
   return <LoginForm demoCredentials={demoStaffCredentials()} />;
 }

@@ -16,11 +16,37 @@ export const users = pgTable(
     id: serial("id").primaryKey(),
     phone: text("phone").notNull(),
     name: text("name").notNull(),
-    role: text("role").notNull().default("CLIENT"), // SUPER_ADMIN | RECEPTIONIST | BARBER | CLIENT
+    /**
+     * Legacy primary role kept for display/compat only. Authorization reads
+     * `user_roles` (multi-role model); a single text field here is never the
+     * source of truth for permission checks.
+     */
+    role: text("role").notNull().default("CLIENT"), // SUPER_ADMIN | MANAGER | RECEPTIONIST | BARBER | CLIENT
     passwordHash: text("password_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_phone_idx").on(t.phone)],
+);
+
+/**
+ * Multi-role membership: one user can hold several roles at once
+ * (e.g. Owner + Barber + Instructor, or Customer + Trainee).
+ * Roles are identities; what each role may do is resolved in src/lib/rbac.ts.
+ */
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // CLIENT | TRAINEE | BARBER | INSTRUCTOR | RECEPTIONIST | MANAGER | FINANCE | SUPER_ADMIN
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_roles_unique_idx").on(t.userId, t.role),
+    index("user_roles_role_idx").on(t.role),
+  ],
 );
 
 export const barbers = pgTable(
@@ -56,6 +82,13 @@ export const barberSkills = pgTable(
     skillId: integer("skill_id")
       .notNull()
       .references(() => skills.id, { onDelete: "cascade" }),
+    /**
+     * Only APPROVED skills take part in scheduling. A barber may claim a skill
+     * themselves (PENDING); management approves or rejects the claim.
+     */
+    status: text("status").notNull().default("APPROVED"), // APPROVED | PENDING | REJECTED
+    approvedBy: integer("approved_by").references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("barber_skill_idx").on(t.barberId, t.skillId)],
 );
@@ -73,11 +106,43 @@ export const services = pgTable(
     barberDurationMin: integer("barber_duration_min").notNull().default(30),
     bufferMin: integer("buffer_min").notNull().default(5),
     basePrice: integer("base_price").notNull().default(0),
-    paymentMode: text("payment_mode").notNull().default("NO_PAYMENT"), // NO_PAYMENT | DEPOSIT | FULL_PAYMENT
-    depositAmount: integer("deposit_amount").notNull().default(0),
-    active: boolean("active").notNull().default(true),
+  paymentMode: text("payment_mode").notNull().default("NO_PAYMENT"), // NO_PAYMENT | DEPOSIT | FULL_PAYMENT
+  depositAmount: integer("deposit_amount").notNull().default(0),
+  /**
+   * Whether this service may run side-by-side with another one on a different
+   * staff member (e.g. skin cleanse while hair colour processes). The visit is
+   * still ONE appointment. Client-visible processing waiting is derived as
+   * duration_min - barber_duration_min.
+   */
+  allowParallel: boolean("allow_parallel").notNull().default(false),
+  /** Booking this service requires a manager/reception confirmation before it is CONFIRMED. */
+  managerApprovalRequired: boolean("manager_approval_required").notNull().default(false),
+  active: boolean("active").notNull().default(true),
   },
   (t) => [uniqueIndex("services_slug_idx").on(t.slug)],
+);
+
+/**
+ * Data-driven combination rules between two services (pair is order
+ * insensitive; stored with serviceAId < serviceBId). Absence of a row means
+ * the default policy: combinable, same barber preferred but not required.
+ */
+export const serviceCombinationRules = pgTable(
+  "service_combination_rules",
+  {
+    id: serial("id").primaryKey(),
+    serviceAId: integer("service_a_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    serviceBId: integer("service_b_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    canCombine: boolean("can_combine").notNull().default(true),
+    sameBarberRequired: boolean("same_barber_required").notNull().default(false),
+    /** Shown to the client verbatim when canCombine is false (reason, not just a disabled control). */
+    note: text("note").notNull().default(""),
+  },
+  (t) => [uniqueIndex("combination_pair_idx").on(t.serviceAId, t.serviceBId)],
 );
 
 export const barberServices = pgTable(
@@ -214,6 +279,27 @@ export const classRegistrations = pgTable(
   ],
 );
 
+/**
+ * Concrete timed sessions of a class. The availability engine treats a
+ * session as a hard block for the instructor, so Academy and Salon calendars
+ * know about each other (a barber who teaches cannot be booked the same hours).
+ */
+export const classSessions = pgTable(
+  "class_sessions",
+  {
+    id: serial("id").primaryKey(),
+    classId: integer("class_id")
+      .notNull()
+      .references(() => classes.id, { onDelete: "cascade" }),
+    date: text("date").notNull(), // YYYY-MM-DD
+    startMin: integer("start_min").notNull(),
+    endMin: integer("end_min").notNull(),
+    /** Extra minutes the instructor stays occupied after the session (teardown). */
+    bufferMin: integer("buffer_min").notNull().default(15),
+  },
+  (t) => [index("class_sessions_date_idx").on(t.date)],
+);
+
 export const payments = pgTable(
   "payments",
   {
@@ -305,10 +391,16 @@ export const bookingPolicyAcceptance = pgTable(
   (t) => [uniqueIndex("policy_user_ver_idx").on(t.userId, t.policyVersion)],
 );
 
+/**
+ * A hold covers an ENTIRE scheduling plan, not a single slot. Every segment
+ * of the plan gets one row; they share `planId` and one expiry so the whole
+ * visit is secured or nothing is.
+ */
 export const bookingHolds = pgTable(
   "booking_holds",
   {
     id: serial("id").primaryKey(),
+    planId: text("plan_id"),
     barberId: integer("barber_id")
       .notNull()
       .references(() => barbers.id, { onDelete: "cascade" }),
@@ -317,6 +409,7 @@ export const bookingHolds = pgTable(
       .references(() => services.id, { onDelete: "cascade" }),
     date: text("date").notNull(),
     startMin: integer("start_min").notNull(),
+    durationMin: integer("duration_min").notNull().default(0),
     clientPhone: text("client_phone").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

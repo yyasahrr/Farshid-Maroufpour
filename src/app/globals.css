@@ -74,9 +74,14 @@
   --color-brass-text: #6b5213;
   --color-success: #2e7d4f;
   --color-warning: #8a6a1e;
+  --color-warning-soft: #f7f0d8;
   --color-danger: #9f3b4c;
+  --color-danger-soft: #f8ecee;
+  --color-accent-line: #bfd9d1;
   --color-booking: #0f5a3b;
   --color-academy: #3f5548;
+  --color-class: #424874;
+  --color-class-soft: #e8eaf6;
   --color-shop: #f7f0d8;
 
   /* Structural separators. These are borders on purpose: they carry layout
@@ -723,6 +728,361 @@ img.no-outline {
     border-radius: 24px 24px 0 0;
     padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
+}
+
+
+
+/* ---------- booking wizard (theme-token surfaces) ----------
+   Rows, switches and chips are token-driven so the customer shell and the
+   operations shell can re-skin the same components by swapping variables. */
+
+.bk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.bk-row-on {
+  border-color: var(--color-action-primary);
+  background: var(--color-accent-soft);
+}
+.bk-row-disabled {
+  opacity: 0.6;
+}
+
+/* signature toggle: real switch semantics (role="switch"), never icon-only */
+.bk-switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-sunken);
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.bk-switch[data-on="true"] {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+}
+.bk-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.bk-switch-thumb {
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: translate var(--duration-fast) var(--ease-enter);
+}
+.bk-switch[data-on="true"] .bk-switch-thumb {
+  translate: 22px 0;
+}
+[dir="rtl"] .bk-switch[data-on="true"] .bk-switch-thumb {
+  translate: -22px 0;
+}
+.bk-switch:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 3px;
+}
+
+.bk-day {
+  flex: 0 0 auto;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.bk-day-on {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-bg);
+}
+
+.bk-time {
+  min-width: 74px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    transform 120ms var(--ease-enter);
+}
+.bk-time:not(:disabled):hover {
+  border-color: var(--color-action-primary);
+}
+.bk-time:not(:disabled):active {
+  transform: scale(0.98);
+}
+.bk-time-on {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-bg);
+}
+.bk-time:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+.bk-seg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--color-surface-sunken);
+  border: 1px solid transparent;
+}
+
+.bk-sticky {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+@media (min-width: 640px) {
+  .bk-sticky {
+    position: static;
+    margin-top: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 14px 16px;
+    background: var(--color-surface);
+    backdrop-filter: none;
+  }
+}
+
+/* ---------- live salon timeline ---------- */
+
+.bk-tl-block {
+  margin-block: 3px;
+  border-radius: 8px;
+  padding: 3px 6px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+.bk-tl-booking {
+  background: var(--color-action-primary);
+  color: var(--color-bg);
+}
+.bk-tl-pending {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  border-style: dashed;
+}
+.bk-tl-hold {
+  background: transparent;
+  border-color: var(--color-action-primary);
+  border-style: dashed;
+  color: var(--color-action-primary);
+}
+.bk-tl-class {
+  background: var(--color-class-soft);
+  color: var(--color-class);
+}
+.bk-tl-block-kind,
+.bk-tl-block {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+.bk-tl-break {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-surface-sunken),
+    var(--color-surface-sunken) 6px,
+    var(--color-border) 6px,
+    var(--color-border) 7px
+  );
+  color: var(--color-text-muted);
+}
+
+
+/* ============================================================
+   Scoped themes. One token swap re-skins every component that
+   reads the semantic roles; nothing here is invented locally.
+   ============================================================ */
+
+/* Customer booking shell — dark premium, gold reserved for
+   selected / active / primary CTA / important state (§33, §34). */
+.theme-customer {
+  --color-bg: #0e100e;
+  --color-surface: #161a17;
+  --color-surface-sunken: #101310;
+  --color-text-primary: #f3f1e7;
+  --color-text-secondary: #c9cfc7;
+  --color-text-muted: #8d968d;
+  --color-action-primary: #d9b364;
+  --color-action-primary-hover: #e8ca8b;
+  --color-accent-soft: rgba(217, 179, 100, 0.14);
+  --color-accent-line: rgba(217, 179, 100, 0.38);
+  --color-brass-text: #e3c990;
+  --color-border: #262b27;
+  --color-border-strong: #3a413b;
+  --color-success: #7fc9a6;
+  --color-warning: #e6c98a;
+  --color-warning-soft: rgba(217, 179, 100, 0.12);
+  --color-danger: #e09aa3;
+  --color-danger-soft: rgba(191, 84, 99, 0.14);
+  --color-booking: #d9b364;
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+.theme-customer .ui-button {
+  background: var(--color-action-primary);
+  color: #191307;
+}
+.theme-customer .ui-button:hover {
+  background: var(--color-action-primary-hover);
+}
+.theme-customer .ui-input,
+.theme-customer .ui-panel,
+.theme-customer .ui-card,
+.theme-customer .bk-row,
+.theme-customer .bk-day,
+.theme-customer .bk-time,
+.theme-customer .bk-sticky,
+.theme-customer .auth-dialog,
+.theme-customer .policy-dialog {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+.theme-customer .ui-input {
+  background: var(--color-surface-sunken);
+}
+.theme-customer :is(.auth-dialog, .policy-dialog) .bg-white {
+  background: var(--color-surface) !important;
+  color: var(--color-text-primary);
+}
+.theme-customer :is(.auth-dialog, .policy-dialog) .bg-\[\#f6f5f1\] {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-text-secondary);
+}
+.theme-customer .bg-\[\#e2efe8\] {
+  background: var(--color-accent-soft) !important;
+}
+.theme-customer .bg-\[\#f6f5f1\] {
+  background: var(--color-surface-sunken) !important;
+}
+.theme-customer .bg-\[\#f7f0d8\] {
+  background: var(--color-warning-soft) !important;
+  color: var(--color-warning);
+}
+.theme-customer .text-\[\#2f4a3a\] {
+  color: var(--color-text-secondary);
+}
+.theme-customer .text-\[\#5f7168\] {
+  color: var(--color-text-muted);
+}
+.theme-customer .text-\[\#8a6a1e\] {
+  color: var(--color-brass-text);
+}
+.theme-customer .border-\[\#e2e5df\] {
+  border-color: var(--color-border) !important;
+}
+
+/* Operations shell (admin / staff) — dark operational UI. */
+.theme-ops {
+  --color-bg: #0f1110;
+  --color-surface: #171a18;
+  --color-surface-sunken: #121413;
+  --color-text-primary: #f1f0ea;
+  --color-text-secondary: #c4cac4;
+  --color-text-muted: #8a938b;
+  --color-action-primary: #2fa37b;
+  --color-action-primary-hover: #3ab88c;
+  --color-accent-soft: rgba(47, 163, 123, 0.16);
+  --color-accent-line: rgba(47, 163, 123, 0.4);
+  --color-border: #262b28;
+  --color-border-strong: #383f3a;
+  --color-class: #9aa3d6;
+  --color-class-soft: rgba(66, 72, 116, 0.35);
+  --color-warning: #e6c98a;
+  --color-warning-soft: rgba(217, 179, 100, 0.12);
+  --color-danger: #e09aa3;
+  --color-danger-soft: rgba(191, 84, 99, 0.14);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+/* Legacy white-glass utilities inside the ops shell collapse onto dark surfaces. */
+.theme-ops .glass-card,
+.theme-ops .glass-floating,
+.theme-ops .glass-subtle {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.theme-ops .bg-white\/70,
+.theme-ops .bg-white\/80,
+.theme-ops .bg-white\/90,
+.theme-ops .bg-white\/95,
+.theme-ops .hover\:bg-white\/90:hover,
+.theme-ops .bg-white {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-text-primary);
+}
+.theme-ops .border-\[\#c59b4b\]\/20,
+.theme-ops .border-\[\#c59b4b\]\/30,
+.theme-ops .border-\[\#c59b4b\]\/40,
+.theme-ops .border-\[\#c59b4b\]\/15,
+.theme-ops .divide-\[\#c59b4b\]\/10 > *,
+.theme-ops .divide-\[\#c59b4b\]\/15 > *,
+.theme-ops .divide-\[\#c59b4b\]\/20 > * {
+  border-color: var(--color-border) !important;
+}
+.theme-ops input,
+.theme-ops select,
+.theme-ops textarea {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+.theme-ops option {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.theme-ops .text-\[\#0f5a3b\] {
+  color: #58c79b;
+}
+.theme-ops .text-\[\#855e16\],
+.theme-ops .text-\[\#8a6a1e\] {
+  color: var(--color-warning);
 }
 
 /* ---------- reduced motion ---------- */

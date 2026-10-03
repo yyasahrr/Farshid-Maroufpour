@@ -1,7 +1,7 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingPolicyAcceptance, otps, users } from "@/db/schema";
+import { bookingPolicyAcceptance, otps, userRoles, users } from "@/db/schema";
 import { setSessionCookie } from "@/lib/session";
 import { sessionSigningSecret } from "@/lib/server-secret";
 import { demoPhones, isOtpDemoMode } from "@/lib/preview";
@@ -127,9 +127,21 @@ async function getUserOrCreate(phone: string, name?: string) {
 type OtpResult = {
   ok: boolean;
   error?: string;
-  user?: { id: number; name: string; phone: string; role: string };
+  user?: { id: number; name: string; phone: string; role: string; roles: string[] };
   isFirstTime?: boolean;
 };
+
+/** Multi-role payload for the client; permissions themselves never leave the server. */
+async function otpUserPayload(userId: number, row: { id: number; name: string; phone: string; role: string }) {
+  const memberships = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    role: row.role,
+    roles: memberships.length ? memberships.map((m) => m.role) : [row.role],
+  };
+}
 
 /**
  * Validates the OTP. For a returning user it consumes the code and starts the
@@ -150,7 +162,7 @@ export async function verifyOtpCode(phone: string, code: string): Promise<OtpRes
   const consumed = await consumeOtp(check.otpId);
   if (!consumed) return { ok: false, error: "این کد قبلاً استفاده شده است." };
   await setSessionCookie(user.id);
-  return { ok: true, isFirstTime: false, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
+  return { ok: true, isFirstTime: false, user: await otpUserPayload(user.id, user) };
 }
 
 /**
@@ -170,7 +182,7 @@ export async function completeOtpOnboarding(phone: string, code: string, name: s
   const consumed = await consumeOtp(check.otpId);
   if (!consumed) return { ok: false, error: "این کد قبلاً استفاده شده است." };
   await setSessionCookie(user.id);
-  return { ok: true, isFirstTime: false, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
+  return { ok: true, isFirstTime: false, user: await otpUserPayload(user.id, user) };
 }
 
 export async function hasAcceptedPolicy(userId: number, version = POLICY_CURRENT_VERSION): Promise<boolean> {

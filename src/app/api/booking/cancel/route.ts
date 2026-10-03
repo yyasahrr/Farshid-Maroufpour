@@ -40,8 +40,11 @@ export async function POST(request: Request) {
       const [appt] = await tx.select().from(appointments).where(eq(appointments.id, appointmentId)).limit(1);
       if (!appt) return { ok: false as const, status: 404, error: "نوبت یافت نشد." };
       const isOwner = appt.clientPhone === user.phone;
-      const isStaff = user.role === "SUPER_ADMIN" || user.role === "RECEPTIONIST" ||
-        (user.role === "BARBER" && groupAppointments.every((item) => user.barberId === item.barberId));
+      // Permission-based: reception/manager cancel anything; a barber only their own visit.
+      const isStaff =
+        user.permissions.has("booking:manage") ||
+        (user.permissions.has("booking:self") &&
+          groupAppointments.every((item) => user.barberId === item.barberId));
       if (!isOwner && !isStaff) return { ok: false as const, status: 403, error: "به این نوبت دسترسی ندارید." };
       if (groupAppointments.some((item) => item.status.startsWith("CANCELLED") || item.status === "COMPLETED" || item.status === "NO_SHOW"))
         return { ok: false as const, status: 409, error: "این نوبت دیگر قابل لغو نیست." };

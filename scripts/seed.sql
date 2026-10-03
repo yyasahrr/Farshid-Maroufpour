@@ -1,8 +1,9 @@
 begin;
 
-truncate table audit_logs, payments, class_registrations, classes, reviews, portfolio_items,
-  appointments, blocked_times, barber_schedule, salon_schedule, barber_services, barber_skills,
-  skills, services, barbers, users, products restart identity cascade;
+truncate table audit_logs, payments, class_registrations, class_sessions, reviews, portfolio_items,
+  appointments, booking_holds, booking_policy_acceptance, notifications,
+  blocked_times, barber_schedule, salon_schedule, barber_services, barber_skills, service_combination_rules,
+  user_roles, skills, services, barbers, users, products restart identity cascade;
 
 insert into users (phone, name, role, password_hash) values
   ('09120000001', 'کیان مرادی', 'SUPER_ADMIN', 'a7cb84d74fd7e9dc0ae672738ee3dd8cff830b2877d2312777b8af4cbe75dd3a'),
@@ -10,6 +11,20 @@ insert into users (phone, name, role, password_hash) values
   ('09120000003', 'سامان یزدانی', 'BARBER', '4c33047d40ecb2db901bb065a082709a91f81cb989e6162a0414efa770376659'),
   ('09120000004', 'نیما فتحی', 'BARBER', '4c33047d40ecb2db901bb065a082709a91f81cb989e6162a0414efa770376659'),
   ('09120000005', 'مریم صدر', 'RECEPTIONIST', 'd552cb20b6529cc99fd13e9e463f196835c0c639bd4bf58ac6e42891ff3494d0');
+
+-- Multi-role membership (source of truth for authorization). A person can hold
+-- several roles at once; skills are separate from roles.
+insert into user_roles (user_id, role) values
+  (1, 'SUPER_ADMIN'), (1, 'MANAGER'),
+  (2, 'BARBER'), (2, 'INSTRUCTOR'), (2, 'MANAGER'),
+  (3, 'BARBER'),
+  (4, 'BARBER'), (4, 'INSTRUCTOR'),
+  (5, 'RECEPTIONIST'), (5, 'FINANCE');
+
+insert into users (phone, name, role) values
+  ('09129998877', 'سارا کاظمی', 'CLIENT');
+insert into user_roles (user_id, role) values
+  (6, 'CLIENT'), (6, 'TRAINEE');
 
 insert into barbers (user_id, slug, name, title, bio, readme, experience_years) values
   (2, 'farshid-maroufpour', 'فرشید معروف پور', 'بنیان‌گذار و مدیر آکادمی', 'متخصص اسکین‌فید و طراحی خط ریش با ۱۲ سال سابقه در تهران و استانبول.',
@@ -23,10 +38,13 @@ insert into skills (name) values
   ('اسکین فید'), ('تکسچرد کراپ'), ('اصلاح کلاسیک'), ('سیزر ورک'),
   ('طراحی ریش'), ('استایل مو'), ('رنگ مو');
 
-insert into barber_skills (barber_id, skill_id) values
-  (1,1),(1,2),(1,5),(1,6),
-  (2,3),(2,4),(2,6),
-  (3,1),(3,7),(3,2);
+-- Only APPROVED skills take part in scheduling. سامان claimed رنگ مو but it is
+-- awaiting management approval, so he is not eligible for the colour service yet.
+insert into barber_skills (barber_id, skill_id, status, approved_by, approved_at) values
+  (1,1,'APPROVED',1,now()),(1,2,'APPROVED',1,now()),(1,5,'APPROVED',1,now()),(1,6,'APPROVED',1,now()),
+  (2,3,'APPROVED',1,now()),(2,4,'APPROVED',1,now()),(2,6,'APPROVED',1,now()),
+  (3,1,'APPROVED',1,now()),(3,7,'APPROVED',1,now()),(3,2,'APPROVED',1,now()),
+  (2,7,'PENDING',null,null);
 
 insert into services (name, slug, description, duration_min, barber_duration_min, buffer_min, base_price, payment_mode, deposit_amount) values
   ('اصلاح مو', 'haircut', 'مشاوره فرم، اصلاح کامل و حالت‌دهی نهایی.', 45, 45, 5, 450000, 'NO_PAYMENT', 0),
@@ -39,6 +57,15 @@ insert into barber_services (barber_id, service_id, custom_price, custom_duratio
   (1,1,null,null),(1,2,700000,null),(1,3,null,null),(1,4,null,null),
   (2,1,null,null),(2,3,null,null),(2,4,null,null),
   (3,1,null,null),(3,2,null,null),(3,5,null,null);
+
+-- Data-driven combination rules (ids follow the service insert order above).
+-- Absence of a pair = default policy: combinable, same barber preferred.
+insert into service_combination_rules (service_a_id, service_b_id, can_combine, same_barber_required, note) values
+  (1, 3, true,  true,  ''),                                                  -- haircut + beard: same barber
+  (1, 4, false, false, 'پکیج مو و ریش خودش شامل اصلاح مو و ریش است؛ نیازی به رزرو جداگانه نیست.'),
+  (5, 4, false, false, 'به دلیل زمان پردازش رنگ، ترکیب آن با پکیج در یک نوبت امکان‌پذیر نیست.'),
+  (1, 5, true,  false, ''),                                                  -- haircut + colour: different staff allowed
+  (2, 5, true,  false, '');
 
 insert into salon_schedule (weekday, open_min, close_min, closed) values
   (0,600,1320,false),(1,600,1320,false),(2,600,1320,false),(3,600,1320,false),
@@ -83,6 +110,15 @@ insert into classes (slug, title, description, instructor_barber_id, kind, level
     E'طراحی خط ریش متناسب با فک\nکار ایمن با تیغ صاف\nمشاوره و قیمت‌گذاری سرویس ریش'),
   ('scissor-classic', 'دوره سیزر ورک کلاسیک', 'سه جلسه تخصصی برای مدل‌های کلاسیک اروپایی و کار با قیچی.', 2, 'WORKSHOP', 'INTERMEDIATE', 10, 2, 7400000, (current_date + 30)::text, 3, 'سالن مرکزی', 'OPEN',
     E'کنترل قیچی و شانه\nاجرای سایدپارت و پومپادور\nهماهنگی فرم با ساختار مو');
+
+-- Concrete timed sessions so Academy classes block the instructor's salon slots.
+insert into class_sessions (class_id, date, start_min, end_min, buffer_min) values
+  (1, (current_date + 10)::text, 1020, 1140, 15),
+  (1, (current_date + 11)::text, 1020, 1140, 15),
+  (2, (current_date + 20)::text, 1080, 1200, 15),
+  (3, (current_date + 30)::text,  900, 1020, 15),
+  (3, (current_date + 31)::text,  900, 1020, 15),
+  (3, (current_date + 32)::text,  900, 1020, 15);
 
 insert into class_registrations (class_id, student_name, student_phone) values
   (1, 'یاسین مرادی', '09126666666'),

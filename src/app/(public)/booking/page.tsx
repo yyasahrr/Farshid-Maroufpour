@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { barberServices, barbers, services } from "@/db/schema";
+import { barberServices, barbers, serviceCombinationRules, services } from "@/db/schema";
 import {
   CustomerBooking,
   type BookingServiceItem,
@@ -16,10 +16,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "رزرو آنلاین خدمات | آکادمی زیبایی فرشید معروف پور" };
 
 export async function loadBookingData() {
-  const [serviceRows, barberRows, links] = await Promise.all([
+  const [serviceRows, barberRows, links, ruleRows] = await Promise.all([
     db.select().from(services).where(eq(services.active, true)),
     db.select().from(barbers).where(eq(barbers.active, true)),
     db.select().from(barberServices),
+    db.select().from(serviceCombinationRules),
   ]);
 
   const barbersList: BookingBarberItem[] = barberRows.map((b) => ({
@@ -42,7 +43,15 @@ export async function loadBookingData() {
     depositAmount: s.depositAmount,
   }));
 
-  return { servicesList, barbersList };
+  const combinationRules = ruleRows.map((r) => ({
+    a: r.serviceAId,
+    b: r.serviceBId,
+    canCombine: r.canCombine,
+    sameBarberRequired: r.sameBarberRequired,
+    note: r.note,
+  }));
+
+  return { servicesList, barbersList, combinationRules };
 }
 
 export default async function BookingPage({
@@ -51,7 +60,7 @@ export default async function BookingPage({
   searchParams: Promise<{ barber?: string; service?: string; date?: string; time?: string }>;
 }) {
   const sp = await searchParams;
-  const [{ servicesList, barbersList }, currentUser] = await Promise.all([
+  const [{ servicesList, barbersList, combinationRules }, currentUser] = await Promise.all([
     loadBookingData(),
     getCurrentUser(),
   ]);
@@ -83,19 +92,20 @@ export default async function BookingPage({
     Number.isInteger(minute) && minute >= 0 && minute < 1440 ? minute : undefined;
 
   return (
-    <main className="min-h-screen bg-[#f6f5f1] px-4 py-6 sm:py-10">
-      <div className="max-w-2xl mx-auto mb-4 flex items-center justify-between text-xs text-[#1f2e27]/60">
-        <Link href="/home" className="hover:text-[#0fa3b1] flex items-center gap-1 font-semibold">
+    <main className="theme-customer min-h-screen bg-transparent px-4 py-6 text-[#f3f1e7] sm:py-10">
+      <div className="max-w-2xl mx-auto mb-4 flex items-center justify-between text-xs text-[var(--color-text-muted)]">
+        <Link href="/home" className="hover:text-[var(--color-action-primary)] flex items-center gap-1 font-semibold">
           <span>←</span>
           <span>خانه</span>
         </Link>
-        <span className="font-bold text-[#1f2e27]/80">رزرو نوبت پیرایش</span>
+        <span className="font-bold text-[var(--color-text-secondary)]">رزرو نوبت پیرایش</span>
       </div>
 
       <CustomerBooking
         key={`${initialBarber}:${initialService}:${initialDate}:${initialStartMin}`}
         servicesList={servicesList}
         barbersList={barbersList}
+        combinationRules={combinationRules}
         initialUser={
           currentUser
             ? {

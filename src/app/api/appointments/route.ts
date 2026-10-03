@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const parsed = CreateAppointmentSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "اطلاعات نامعتبر است." }, { status: 400 });
 
-  const staff = user ? isStaff(user.role) : false;
+  const staff = user ? isStaff(user) : false;
   if (!staff && parsed.data.source !== "ONLINE") return NextResponse.json({ error: "دسترسی غیرمجاز است." }, { status: 403 });
   if (user && !staff && (parsed.data.clientPhone !== user.phone || parsed.data.clientName !== user.name || !user.name.trim()))
     return NextResponse.json({ error: "اطلاعات رزرو باید با حساب واردشده مطابقت داشته باشد." }, { status: 403 });

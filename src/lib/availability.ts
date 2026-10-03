@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appointments,
@@ -8,6 +8,8 @@ import {
   barbers,
   blockedTimes,
   bookingHolds,
+  classSessions,
+  classes,
   salonSchedule,
   services,
 } from "@/db/schema";
@@ -34,6 +36,10 @@ export type ResolvedService = {
   /** Time during which the assigned barber is occupied. */
   barberDurationMin: number;
   bufferMin: number;
+  /** Minutes the client waits (processing) while the barber may be released. */
+  processingMin: number;
+  allowParallel: boolean;
+  managerApprovalRequired: boolean;
   price: number;
   paymentMode: "NO_PAYMENT" | "DEPOSIT" | "FULL_PAYMENT";
   depositAmount: number;
@@ -42,6 +48,13 @@ export type ResolvedService = {
   /** Amount still payable at the salon. */
   remainingDue: number;
 };
+
+/**
+ * Skills gate scheduling: a PENDING/REJECTED claim never makes a barber
+ * eligible. Every eligibility query in the app filters `barber_skills` with
+ * status = 'APPROVED'.
+ */
+export const SKILL_APPROVED = "APPROVED" as const;
 
 /** Splits a service price into the online deposit and the salon balance. */
 export function splitPayment(
@@ -73,8 +86,13 @@ export async function resolveService(
     .where(and(eq(barbers.id, barberId), eq(barbers.active, true))).limit(1);
   if (!barber) return null;
   if (svc.requiredSkillId) {
+    // Only an APPROVED skill makes this barber eligible (skill approval gates scheduling).
     const [approvedSkill] = await db.select({ id: barberSkills.id }).from(barberSkills)
-      .where(and(eq(barberSkills.barberId, barberId), eq(barberSkills.skillId, svc.requiredSkillId))).limit(1);
+      .where(and(
+        eq(barberSkills.barberId, barberId),
+        eq(barberSkills.skillId, svc.requiredSkillId),
+        eq(barberSkills.status, SKILL_APPROVED),
+      )).limit(1);
     if (!approvedSkill) return null;
   }
   const [link] = await db
@@ -94,12 +112,18 @@ export async function resolveService(
     svc.paymentMode as ResolvedService["paymentMode"],
     svc.depositAmount,
   );
+  const barberDurationMin = link.customBarberDuration ?? svc.barberDurationMin;
+  const durationMin = Math.max(link.customDuration ?? svc.durationMin, barberDurationMin);
   return {
     id: svc.id,
     name: svc.name,
-    durationMin: link.customDuration ?? svc.durationMin,
-    barberDurationMin: link.customBarberDuration ?? svc.barberDurationMin,
+    durationMin,
+    barberDurationMin,
     bufferMin: svc.bufferMin,
+    /** Client stays past the barber's work (processing); derived, never invented. */
+    processingMin: Math.max(0, durationMin - barberDurationMin),
+    allowParallel: svc.allowParallel,
+    managerApprovalRequired: svc.managerApprovalRequired,
     price,
     paymentMode: svc.paymentMode as ResolvedService["paymentMode"],
     depositAmount: svc.depositAmount,
@@ -108,7 +132,7 @@ export async function resolveService(
   };
 }
 
-type DayContext = {
+export type DayContext = {
   open: boolean;
   startMin: number;
   endMin: number;
@@ -154,10 +178,20 @@ export async function getDayContext(
     .select()
     .from(blockedTimes)
     .where(and(eq(blockedTimes.barberId, barberId), eq(blockedTimes.date, date)));
+  // Academy awareness: today's class sessions block the instructor's salon availability.
+  const teachSessions = await db
+    .select({
+      startMin: classSessions.startMin,
+      endMin: sql<number>`${classSessions.endMin} + ${classSessions.bufferMin}`,
+    })
+    .from(classSessions)
+    .innerJoin(classes, eq(classes.id, classSessions.classId))
+    .where(and(eq(classSessions.date, date), eq(classes.instructorBarberId, barberId)));
   const holds = await db.select({
     id: bookingHolds.id,
     startMin: bookingHolds.startMin,
     clientPhone: bookingHolds.clientPhone,
+    durationMin: bookingHolds.durationMin,
     duration: services.barberDurationMin,
     customDuration: barberServices.customBarberDuration,
     bufferMin: services.bufferMin,
@@ -177,20 +211,24 @@ export async function getDayContext(
       ...holds.filter((h) => !excludePhone || h.clientPhone !== excludePhone)
         .map((h) => ({
           start: h.startMin,
-          end: h.startMin + (h.customDuration ?? h.duration) + h.bufferMin,
+          // Plan holds store their exact occupied span; legacy rows fall back
+          // to resolving the service duration for this barber.
+          end: h.startMin + (h.durationMin > 0 ? h.durationMin : (h.customDuration ?? h.duration) + h.bufferMin),
           id: -h.id,
         })),
     ],
-    blocked: blocks.map((b) => ({
-      start: b.fullDay ? 0 : b.startMin,
-      end: b.fullDay ? 24 * 60 : b.endMin,
-    })),
+    blocked: [
+      ...blocks.map((b) => ({
+        start: b.fullDay ? 0 : b.startMin,
+        end: b.fullDay ? 24 * 60 : b.endMin,
+      })),
+      ...teachSessions.map((s) => ({ start: s.startMin, end: s.endMin })),
+    ],
   };
 }
 
-function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number) {
-  return aStart < bEnd && bStart < aEnd;
-}
+import { overlaps } from "./windows";
+export { overlaps };
 
 export function buildSlots(
   ctx: DayContext,
