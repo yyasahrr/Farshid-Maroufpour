@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BrandMonogram, Icon, type IconName } from "@/components/icons";
 import { BookingAuthModal, type AuthUser } from "@/components/booking/BookingAuthModal";
-import { AtelierVideo } from "@/components/atelier-video";
 import { heroIntro } from "@/components/motion";
 import { CONTACT_ADDRESS, CONTACT_PHONE_DISPLAY, CONTACT_PHONE_TEL, OPENING_HOURS } from "@/lib/site";
 
@@ -109,9 +108,6 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         <p data-hero-copy="" className="mt-2 max-w-lg text-sm leading-7 font-semibold text-pretty text-[#dfe5e4] sm:text-base">
           وقت مناسب را انتخاب کنید؛ برای یادگیری و مراقبت از استایل هم کنار شماییم.
         </p>
-        <div data-hero-copy="" className="mt-3">
-          <AtelierVideo />
-        </div>
       </main>
 
       <div className="mx-auto w-full max-w-[730px] space-y-3 px-4 pb-[max(24px,env(safe-area-inset-bottom))] sm:px-8 sm:pb-9">
@@ -164,6 +160,12 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
             </span>
           </button>
         </div>
+        <p className="pt-1 text-left text-[10px] text-white/40">
+          ویدئوی پس‌زمینه:{" "}
+          <a className="underline underline-offset-2 hover:text-white/70" href="https://www.pexels.com/video/a-man-having-a-haircut-4177954/" target="_blank" rel="noreferrer">
+            Pavel Danilyuk / Pexels
+          </a>
+        </p>
       </div>
 
       <BookingAuthModal
