@@ -4,6 +4,14 @@ import { logoutAction } from "@/lib/actions/auth";
 import { ToastProvider } from "@/components/toast";
 import { BrandMonogram } from "@/components/icons";
 
+/**
+ * Operations shell (admin / staff). v2 «اتاق فرمانِ امروز»:
+ * the page leads with TODAY — nav groups sections by the job being done,
+ * not by table inventory. Panels share one header rhythm; a count badge means
+ * "items here need action", never decoration.
+ */
+export type OpsSection = { id: string; label: string; group?: string; count?: number };
+
 export function DashboardShell({
   title,
   subtitle,
@@ -12,38 +20,37 @@ export function DashboardShell({
 }: {
   title: string;
   subtitle: string;
-  sections: { id: string; label: string }[];
+  sections: OpsSection[];
   children: ReactNode;
 }) {
+  const groups: { name: string | null; items: OpsSection[] }[] = [];
+  for (const s of sections) {
+    const name = s.group ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.name === name) last.items.push(s);
+    else groups.push({ name, items: [s] });
+  }
+
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#fdfcf9] text-bone">
-        <header className="glass-floating sticky top-0 z-30 border-b border-[#c59b4b]/20">
-          <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/home"
-                className="focus-ring flex items-center gap-2 rounded text-sm font-black tracking-[0.3em] text-[#0f5a3b]"
-              >
+      <div className="theme-ops min-h-screen text-bone">
+        <header className="ops-panel glass-floating sticky top-0 z-30 !rounded-none !border-x-0 !border-t-0 backdrop-blur">
+          <div className="mx-auto flex h-14 max-w-[1360px] items-center justify-between gap-4 px-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/home" className="focus-ring flex shrink-0 items-center gap-2 rounded text-sm font-extrabold text-[var(--color-text-primary)]">
                 <BrandMonogram className="!h-7 !w-[21px]" />
-                FARSHID
+                <span className="hidden sm:inline">Farshid</span>
               </Link>
-              <span className="text-xs font-semibold text-[#855e16] bg-[#c59b4b]/15 px-2.5 py-0.5 rounded-full">
-                {subtitle}
+              <span className="ops-meta truncate">
+                {title} · <span className="text-[var(--color-text-secondary)]">{subtitle}</span>
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/home"
-                className="focus-ring rounded-full border border-[#0f5a3b]/25 bg-white px-3.5 py-1 text-xs font-semibold text-[#0f5a3b] hover:border-[#c59b4b]"
-              >
+            <div className="flex shrink-0 items-center gap-2">
+              <Link href="/home" className="focus-ring ops-btn ops-btn-quiet !py-1.5">
                 مشاهده وبسایت
               </Link>
               <form action={logoutAction}>
-                <button
-                  type="submit"
-                  className="focus-ring rounded-full border border-rose-200 bg-rose-50 px-3.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                >
+                <button type="submit" className="focus-ring ops-btn ops-btn-danger !py-1.5">
                   خروج
                 </button>
               </form>
@@ -51,47 +58,40 @@ export function DashboardShell({
           </div>
         </header>
 
-        <div className="mx-auto flex max-w-7xl gap-8 px-4 py-8">
-          <nav
-            aria-label="بخش‌های داشبورد"
-            className="hidden w-44 shrink-0 lg:block"
-          >
-            <div className="flex items-center gap-1.5 mb-3">
-              <span className="h-2 w-2 rounded-full bg-[#c59b4b]" />
-              <p className="text-xs font-bold tracking-[0.2em] text-[#0f5a3b]">
-                {title}
-              </p>
-            </div>
-            <ul className="sticky top-24 space-y-1 text-xs font-semibold">
-              {sections.map((s) => (
-                <li key={s.id}>
-                  <a
-                    href={`#${s.id}`}
-                    className="focus-ring block rounded-xl px-3 py-2 text-bone/70 transition hover:bg-[#0f5a3b]/10 hover:text-[#0f5a3b]"
-                  >
-                    {s.label}
-                  </a>
-                </li>
+        <div className="mx-auto flex max-w-[1360px] gap-7 px-4 py-6">
+          <nav aria-label="بخش‌های داشبورد" className="ops-nav hidden w-52 shrink-0 lg:block">
+            <div className="sticky top-20">
+              {groups.map((g) => (
+                <div key={g.name ?? "_"}>
+                  {g.name && <p className="ops-group-label">{g.name}</p>}
+                  <ul>
+                    {g.items.map((s) => (
+                      <li key={s.id}>
+                        <a href={`#${s.id}`}>
+                          <span className="min-w-0 truncate">{s.label}</span>
+                          {!!s.count && s.count > 0 && <span className="ops-count">{s.count.toLocaleString("fa-IR")}</span>}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </nav>
-          <div className="min-w-0 flex-1 space-y-10 pb-24 lg:pb-8">
-            {children}
-          </div>
+
+          <main className="min-w-0 flex-1 space-y-6 pb-24 lg:pb-8">{children}</main>
         </div>
 
         <nav
           aria-label="ناوبری موبایل"
-          className="glass-floating safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-[#c59b4b]/20 lg:hidden"
+          className="ops-panel glass-floating safe-bottom fixed inset-x-0 bottom-0 z-30 lg:hidden !rounded-none !border-x-0 !border-b-0"
         >
-          <ul className="flex justify-around py-2 text-[11px] font-bold">
-            {sections.slice(0, 4).map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#${s.id}`}
-                  className="focus-ring block rounded px-3 py-2 text-bone/70 hover:text-[#0f5a3b]"
-                >
+          <ul className="flex gap-1.5 overflow-x-auto px-3 py-2 text-[12px] font-bold [-webkit-overflow-scrolling:touch]">
+            {sections.map((s) => (
+              <li key={s.id} className="shrink-0">
+                <a href={`#${s.id}`} className="focus-ring block rounded-full border border-[var(--color-border)] px-3.5 py-1.5 whitespace-nowrap text-[var(--color-text-secondary)]">
                   {s.label}
+                  {!!s.count && s.count > 0 ? ` (${s.count.toLocaleString("fa-IR")})` : ""}
                 </a>
               </li>
             ))}
@@ -106,26 +106,31 @@ export function Panel({
   id,
   title,
   description,
+  count,
+  actions,
   children,
 }: {
   id: string;
   title: string;
   description?: string;
+  /** Number of items here that need action; renders a warn chip. */
+  count?: number;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section
-      id={id}
-      className="glass-card scroll-mt-20 rounded-3xl p-5 md:p-7 border border-[#c59b4b]/25 shadow-sm"
-    >
-      <div className="flex items-center gap-2">
-        <span className="h-1.5 w-4 rounded-full bg-[#c59b4b]" />
-        <h2 className="text-lg font-black text-bone">{title}</h2>
+    <section id={id} className="ops-panel">
+      <div className="ops-panel-head">
+        <h2 className="flex items-center gap-2.5">
+          {title}
+          {!!count && count > 0 && (
+            <span className="ops-chip ops-chip-wait">{`${count.toLocaleString("fa-IR")} در انتظار اقدام`}</span>
+          )}
+        </h2>
+        {actions && <div className="flex items-center gap-2">{actions}</div>}
       </div>
-      {description && (
-        <p className="mt-1 text-xs text-bone/55">{description}</p>
-      )}
-      <div className="mt-5">{children}</div>
+      {description && <p className="ops-panel-desc">{description}</p>}
+      <div className="mt-4">{children}</div>
     </section>
   );
 }

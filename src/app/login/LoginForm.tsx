@@ -10,20 +10,20 @@ export function LoginForm({ demoCredentials }: { demoCredentials: { label: strin
 
   return (
     <main className="flex min-h-screen items-center justify-center px-5 py-12">
-      <div className="glass-card w-full max-w-md rounded-3xl p-8 border-2 border-[#c59b4b]/35 shadow-lg">
+      <div className="glass-card w-full max-w-md rounded-3xl p-8 border-2 border-brass-400/35 shadow-lg">
         <Link
           href="/home"
-          className="focus-ring rounded text-xs font-semibold text-[#0f5a3b] hover:text-[#c59b4b]"
+          className="focus-ring rounded text-xs font-semibold text-brand-700 hover:text-brass-700"
         >
           ← بازگشت به وبسایت
         </Link>
         <div className="mt-4 flex items-center gap-3">
-          <BrandMonogram className="!h-11 !w-[33px] text-[#0f5a3b]" />
+          <BrandMonogram className="!h-11 !w-[33px] text-brand-700" />
           <span className="flex items-baseline gap-2">
-            <span className="text-xl font-black tracking-[0.3em] text-[#0f5a3b]">
+            <span className="text-xl font-black tracking-[0.3em] text-brand-700">
               FARSHID
             </span>
-            <span className="text-[10px] font-bold tracking-widest text-[#c59b4b]">
+            <span className="text-[10px] font-bold tracking-widest text-brass-700">
               PORTAL
             </span>
           </span>
@@ -36,8 +36,8 @@ export function LoginForm({ demoCredentials }: { demoCredentials: { label: strin
         </p>
 
         {demoCredentials.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-[#c59b4b]/30 bg-white/70 p-3.5 text-xs text-bone/70 space-y-1">
-            <p className="font-bold text-[#0f5a3b]">حساب‌های آزمایشی (فقط در حالت پیش‌نمایش):</p>
+          <div className="mt-4 rounded-2xl border border-brass-400/30 bg-white/70 p-3.5 text-xs text-bone/70 space-y-1">
+            <p className="font-bold text-brand-700">حساب‌های آزمایشی (فقط در حالت پیش‌نمایش):</p>
             {demoCredentials.map((item) => (
               <p key={item.value}>
                 {item.label}:{" "}
@@ -65,7 +65,7 @@ export function LoginForm({ demoCredentials }: { demoCredentials: { label: strin
               autoComplete="username"
               inputMode="numeric"
               placeholder="09120000001"
-              className="focus-ring mt-1.5 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-4 py-3 text-sm font-mono"
+              className="focus-ring mt-1.5 w-full rounded-xl border border-brass-400/30 bg-white px-4 py-3 text-sm font-mono"
             />
           </div>
           <div>
@@ -82,7 +82,7 @@ export function LoginForm({ demoCredentials }: { demoCredentials: { label: strin
               dir="ltr"
               required
               autoComplete="current-password"
-              className="focus-ring mt-1.5 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-4 py-3 text-sm"
+              className="focus-ring mt-1.5 w-full rounded-xl border border-brass-400/30 bg-white px-4 py-3 text-sm"
             />
           </div>
           {error && (
@@ -96,7 +96,7 @@ export function LoginForm({ demoCredentials }: { demoCredentials: { label: strin
           <button
             type="submit"
             disabled={pending}
-            className="focus-ring w-full rounded-full bg-[#0f5a3b] py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[#094028] disabled:bg-bone/15 disabled:text-bone/40"
+            className="focus-ring w-full rounded-full bg-brand-700 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[#094028] disabled:bg-bone/15 disabled:text-bone/40"
           >
             {pending ? "در حال اعتبارسنجی…" : "ورود به پنل مدیریت"}
           </button>

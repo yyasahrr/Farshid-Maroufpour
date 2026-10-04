@@ -27,7 +27,7 @@ export function PublicChromeWrapper({
     isQuickAccess ? (
       <div className="min-h-screen">{children}</div>
     ) : (
-      <div className="flex min-h-screen flex-col bg-[#f6f5f1]">
+      <div className="flex min-h-screen flex-col bg-bone-100">
         {!isMinimalFlow && header}
         <main className={`flex-1 ${!isMinimalFlow ? "pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}>{children}</main>
         {!isMinimalFlow && footer}

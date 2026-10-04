@@ -101,9 +101,9 @@ export function AlibabaSearchBox({
               aria-selected={isActive}
               type="button"
               onClick={() => handleTabClick(tab)}
-              className={`focus-ring shrink-0 flex items-center gap-2 rounded-t-2xl px-5 py-3 text-xs font-bold transition-all duration-200 border-t-2 ${
+              className={`focus-ring shrink-0 flex items-center gap-2 rounded-t-2xl px-5 py-3 text-xs font-bold transition-colors duration-200 border-t-2 ${
                 isActive
-                  ? "bg-white text-[#0f5a3b] border-[#0f5a3b] shadow-[0_-4px_16px_rgba(15,90,59,0.08)] ring-1 ring-[#c59b4b]/20"
+                  ? "bg-white text-brand-700 border-brand-700 shadow-[0_-4px_16px_rgba(15,90,59,0.08)] ring-1 ring-brass-400/20"
                   : "bg-white/60 text-bone/60 border-transparent hover:bg-white/90 hover:text-bone"
               }`}
             >
@@ -117,16 +117,16 @@ export function AlibabaSearchBox({
       {/* Alibaba-style Segmented Search & Booking Box */}
       <form
         onSubmit={handleSearch}
-        className="rounded-3xl rounded-tr-none bg-white p-4 shadow-[0_20px_50px_-15px_rgba(15,90,59,0.18)] border-2 border-[#c59b4b]/30"
+        className="rounded-3xl rounded-tr-none bg-white p-4 shadow-[0_20px_50px_-15px_rgba(15,90,59,0.18)] border-2 border-brass-400/30"
       >
-        <div className="grid grid-cols-1 divide-y divide-[#c59b4b]/15 sm:grid-cols-2 sm:divide-y-0 sm:divide-x sm:divide-x-reverse lg:grid-cols-12">
+        <div className="grid grid-cols-1 divide-y divide-brass-400/15 sm:grid-cols-2 sm:divide-y-0 sm:divide-x sm:divide-x-reverse lg:grid-cols-12">
           {/* Section 1: Service */}
-          <div className="lg:col-span-3 p-3 transition hover:bg-[#fbf9f4] rounded-2xl">
+          <div className="lg:col-span-3 p-3 transition hover:bg-bone-50 rounded-2xl">
             <label htmlFor="search-service" className="block text-[11px] font-bold text-bone/50">
               خدمت مورد نظر
             </label>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-base text-[#0f5a3b]">✂️</span>
+              <span className="text-base text-brand-700">✂️</span>
               <select
                 id="search-service"
                 value={selectedServiceId}
@@ -140,18 +140,18 @@ export function AlibabaSearchBox({
                 ))}
               </select>
             </div>
-            <p className="mt-1 text-[10px] text-[#855e16] font-semibold truncate">
+            <p className="mt-1 text-[10px] text-brass-600 font-semibold truncate">
               {selectedService ? `${selectedService.durationMin} دقیقه مشاوره و اجرا` : "انتخاب خدمت"}
             </p>
           </div>
 
           {/* Section 2: Barber */}
-          <div className="lg:col-span-3 p-3 transition hover:bg-[#fbf9f4] rounded-2xl">
+          <div className="lg:col-span-3 p-3 transition hover:bg-bone-50 rounded-2xl">
             <label htmlFor="search-barber" className="block text-[11px] font-bold text-bone/50">
               مسترباربر
             </label>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-base text-[#c59b4b]">👤</span>
+              <span className="text-base text-brass-700">👤</span>
               <select
                 id="search-barber"
                 value={selectedBarberId}
@@ -168,18 +168,18 @@ export function AlibabaSearchBox({
                 ))}
               </select>
             </div>
-            <p className="mt-1 text-[10px] text-[#0f5a3b] font-semibold truncate">
+            <p className="mt-1 text-[10px] text-brand-700 font-semibold truncate">
               {selectedBarber ? selectedBarber.title : "پیشنهاد خودکار اولین صندلی خالی"}
             </p>
           </div>
 
           {/* Section 3: Date */}
-          <div className="lg:col-span-3 p-3 transition hover:bg-[#fbf9f4] rounded-2xl">
+          <div className="lg:col-span-3 p-3 transition hover:bg-bone-50 rounded-2xl">
             <label htmlFor="search-date" className="block text-[11px] font-bold text-bone/50">
               تاریخ حضور
             </label>
             <div className="mt-1 flex items-center gap-2">
-              <span className="text-base text-[#0f5a3b]">📅</span>
+              <span className="text-base text-brand-700">📅</span>
               <select
                 id="search-date"
                 value={selectedDate}
@@ -199,13 +199,13 @@ export function AlibabaSearchBox({
           </div>
 
           {/* Section 4: Time Window */}
-          <div className="lg:col-span-3 p-3 flex flex-col justify-between transition hover:bg-[#fbf9f4] rounded-2xl">
+          <div className="lg:col-span-3 p-3 flex flex-col justify-between transition hover:bg-bone-50 rounded-2xl">
             <div>
               <label htmlFor="search-window" className="block text-[11px] font-bold text-bone/50">
                 بازه زمانی روز
               </label>
               <div className="mt-1 flex items-center gap-2">
-                <span className="text-base text-[#c59b4b]">🕒</span>
+                <span className="text-base text-brass-700">🕒</span>
                 <select
                   id="search-window"
                   value={selectedWindow}
@@ -224,7 +224,7 @@ export function AlibabaSearchBox({
         </div>
 
         {/* Action Button Row */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#c59b4b]/15 pt-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-brass-400/15 pt-3">
           <div className="flex items-center gap-4 text-xs text-bone/60">
             <span className="flex items-center gap-1.5">
               <span className="text-emerald-600 font-bold">✓</span>
@@ -238,7 +238,7 @@ export function AlibabaSearchBox({
 
           <button
             type="submit"
-            className="focus-ring flex items-center justify-center gap-2 rounded-2xl bg-[#0f5a3b] px-8 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[#094028] hover:shadow-[0_10px_24px_rgba(197,155,75,0.5)] w-full sm:w-auto"
+            className="focus-ring flex items-center justify-center gap-2 rounded-2xl bg-brand-700 px-8 py-3.5 text-sm font-black text-white shadow-md transition hover:bg-[#094028] hover:shadow-[0_10px_24px_rgba(197,155,75,0.5)] w-full sm:w-auto"
           >
             <span>جستجوی نوبت‌های آزاد</span>
             <span aria-hidden="true" className="text-base font-normal">🔍</span>

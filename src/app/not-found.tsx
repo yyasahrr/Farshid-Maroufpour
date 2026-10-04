@@ -10,7 +10,7 @@ export const metadata = { title: "صفحه پیدا نشد" };
  */
 export default function NotFound() {
   return (
-    <main dir="rtl" className="flex min-h-[100svh] flex-col items-center justify-center gap-6 bg-[#1f2e27] px-5 py-16 text-center text-white">
+    <main dir="rtl" className="flex min-h-[100svh] flex-col items-center justify-center gap-6 bg-bone-700 px-5 py-16 text-center text-white">
       <Link href="/home" className="focus-ring flex items-center gap-3 rounded-xl text-sm font-black">
         <BrandMonogram className="!h-10 !w-[30px]" />
         <span>{SITE_NAME}</span>
@@ -20,7 +20,7 @@ export default function NotFound() {
       </p>
       <div>
         <h1 className="text-2xl font-black">این صفحه پیدا نشد</h1>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-8 text-[#d5dfe0]">
+        <p className="mx-auto mt-3 max-w-md text-sm leading-8 text-bone-300">
           ممکن است آدرس تغییر کرده باشد یا آرایشگر و خدمتی که دنبالش بودید دیگر فعال نباشد.
         </p>
       </div>
@@ -35,7 +35,7 @@ export default function NotFound() {
       </div>
       <p className="text-xs text-[#b8c5c6]">
         برای پیگیری نوبت‌های ثبت‌شده به{" "}
-        <Link href="/track" className="ui-link !text-[#d5dfe0]">
+        <Link href="/track" className="ui-link !text-bone-300">
           صفحه پیگیری
         </Link>{" "}
         سر بزنید.

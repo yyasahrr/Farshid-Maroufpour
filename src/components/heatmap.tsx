@@ -40,7 +40,7 @@ export function AvailabilityHeatmap({
           <tbody>
             {days.map((d) => (
               <tr key={d.date}>
-                <th scope="row" className="pl-2 text-right text-[11px] font-bold text-bone/70">
+                <th scope="row" className="ps-2 text-start text-[11px] font-bold text-bone/70">
                   {formatPersianDate(d.date).split("،")[0]}
                 </th>
                 {d.slots.map((s) => (

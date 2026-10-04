@@ -6,6 +6,7 @@ import { CustomerPanelClient } from "@/components/customer/CustomerPanelClient";
 import { CustomerLoginPrompt } from "@/components/customer/CustomerLoginPrompt";
 import { todayISO } from "@/lib/time";
 import { demoPhoneHint } from "@/lib/preview";
+import { getUserCourseEnrollments } from "@/lib/course-queries";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "پنل من" };
@@ -14,13 +15,14 @@ export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) return <div className="ui-shell ui-container flex min-h-[70svh] items-center justify-center py-10"><CustomerLoginPrompt demoPhoneHint={demoPhoneHint()} /></div>;
   const today = todayISO();
-  const [appointmentRows, registrationRows] = await Promise.all([
+  const [appointmentRows, registrationRows, courseRows] = await Promise.all([
     db.select({ id: appointments.id, bookingGroupId: appointments.bookingGroupId, clientName: appointments.clientName, date: appointments.date, startMin: appointments.startMin, endMin: appointments.endMin, priceSnapshot: appointments.priceSnapshot, status: appointments.status, notes: appointments.notes, barberName: barbers.name, barberSlug: barbers.slug, serviceName: services.name, serviceId: services.id })
       .from(appointments).innerJoin(barbers, eq(appointments.barberId, barbers.id)).innerJoin(services, eq(appointments.serviceId, services.id))
       .where(eq(appointments.clientPhone, user.phone)).orderBy(desc(appointments.date), desc(appointments.startMin)),
     db.select({ id: classRegistrations.id, title: classes.title, slug: classes.slug, startsOn: classes.startsOn, location: classes.location, status: classRegistrations.status })
       .from(classRegistrations).innerJoin(classes, eq(classRegistrations.classId, classes.id))
       .where(eq(classRegistrations.studentPhone, user.phone)).orderBy(desc(classes.startsOn)),
+    getUserCourseEnrollments(user.id),
   ]);
   const groupFirstIds = new Map<string, number>();
   for (const appointment of appointmentRows) {
@@ -48,5 +50,14 @@ export default async function AccountPage() {
   const past = bookings.filter((a) => !a.status.startsWith("CANCELLED") && (a.date < today || a.status === "COMPLETED" || a.status === "NO_SHOW"));
   const cancelled = bookings.filter((a) => a.status.startsWith("CANCELLED"));
   const classesList = registrationRows.map((row) => ({ ...row, paymentReference: classPayments.find((p) => p.refId === row.id)?.reference ?? null, paymentStatus: classPayments.find((p) => p.refId === row.id)?.status ?? null }));
-  return <div className="ui-shell ui-container ui-page"><CustomerPanelClient user={{ id: user.id, name: user.name, phone: user.phone, role: user.role }} upcoming={upcoming} past={past} cancelled={cancelled} enrolledClasses={classesList} /></div>;
+  const myCourses = courseRows.map((row) => {
+    let done = 0;
+    try { const parsed: unknown = JSON.parse(row.completedLessonIds); if (Array.isArray(parsed)) done = parsed.length; } catch { done = 0; }
+    return {
+      id: row.id, title: row.title, slug: row.slug, status: row.status,
+      grade: row.grade, resultNote: row.resultNote, totalLessons: Number(row.totalLessons), doneLessons: done,
+      paymentReference: row.paymentReference,
+    };
+  });
+  return <div className="ui-shell ui-container ui-page"><CustomerPanelClient user={{ id: user.id, name: user.name, phone: user.phone, role: user.role }} upcoming={upcoming} past={past} cancelled={cancelled} enrolledClasses={classesList} enrolledCourses={myCourses} /></div>;
 }

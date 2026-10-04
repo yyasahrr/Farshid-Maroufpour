@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BrandMonogram, Icon, type IconName } from "@/components/icons";
 import { BookingAuthModal, type AuthUser } from "@/components/booking/BookingAuthModal";
-import { AtelierVideo } from "@/components/atelier-video";
 import { heroIntro } from "@/components/motion";
 import { CONTACT_ADDRESS, CONTACT_PHONE_DISPLAY, CONTACT_PHONE_TEL, OPENING_HOURS } from "@/lib/site";
 
@@ -16,7 +15,21 @@ const shortcuts: Shortcut[] = [
   { href: "/shop", title: "فروشگاه", caption: "محصولات پیرایش", icon: "diamond", tone: "shop" },
 ];
 
-export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: AuthUser | null; demoPhoneHint?: string }) {
+export function QuickAccessPage({
+  initialUser,
+  demoPhoneHint,
+  contact: savedContact,
+}: {
+  initialUser: AuthUser | null;
+  demoPhoneHint?: string;
+  /** admin-managed via site_settings (Neshan panel); falls back to constants */
+  contact?: { address: string; lat: number | null; lng: number | null };
+}) {
+  const address = savedContact?.address ?? CONTACT_ADDRESS;
+  const directions =
+    savedContact && savedContact.lat !== null && savedContact.lng !== null
+      ? `https://neshan.org/link/place?ll=${savedContact.lat},${savedContact.lng}&z=17&src=farshid-academy`
+      : null;
   const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState(initialUser);
@@ -40,13 +53,8 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
     return heroIntro(node);
   }, []);
 
-  function book() {
-    if (user) router.push("/booking");
-    else setAuthOpen(true);
-  }
-
   return (
-    <div ref={root} className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-[#1f2e27] text-white">
+    <div ref={root} className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-bone-700 text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <Image src="/images/video-poster.jpg" fill priority sizes="100vw" alt="" className="object-cover object-center" />
         {playVideo && !videoError && (
@@ -86,7 +94,7 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
           </button>
           <Link
             href="/home"
-            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#0f5a3b] transition-colors hover:bg-[#e3f0e9]"
+            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-50"
           >
             ورود به سایت
           </Link>
@@ -109,27 +117,22 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         <p data-hero-copy="" className="mt-2 max-w-lg text-sm leading-7 font-semibold text-pretty text-[#dfe5e4] sm:text-base">
           وقت مناسب را انتخاب کنید؛ برای یادگیری و مراقبت از استایل هم کنار شماییم.
         </p>
-        <div data-hero-copy="" className="mt-3">
-          <AtelierVideo />
-        </div>
       </main>
 
       <div className="mx-auto w-full max-w-[730px] space-y-3 px-4 pb-[max(24px,env(safe-area-inset-bottom))] sm:px-8 sm:pb-9">
-        <button
-          type="button"
-          onClick={book}
+        <Link
+          href="/booking"
           data-hero-card=""
           className="focus-ring bento-card-interactive bento-shortcut-booking flex min-h-[118px] w-full items-center justify-between gap-4 rounded-[26px] p-5 text-right sm:p-6"
         >
           <div>
-            <span className="ui-pill bg-[#0b4a30]/65 text-[#d9f2e6]">پیشنهاد اصلی</span>
-            <h2 className="mt-2 text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
-            <p className="mt-1 text-sm leading-6 text-pretty text-[#eaf9f9]">خدمت و زمان مناسب خود را پیدا کنید.</p>
+            <h2 className="text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
+            <p className="mt-1 text-sm leading-6 text-pretty opacity-75">خدمت، آرایشگر و زمان را بردار؛ نام و شماره فقط مرحلهٔ آخر — همان‌جا حساب خودکار ساخته می‌شود.</p>
           </div>
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white/20">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-brand-50 text-brand-700">
             <Icon name="scissors" className="h-7 w-7" weight="strong" />
           </span>
-        </button>
+        </Link>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {shortcuts.map((item) => (
             <Link
@@ -164,6 +167,12 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
             </span>
           </button>
         </div>
+        <p className="pt-1 text-left text-[10px] text-white/40">
+          ویدئوی پس‌زمینه:{" "}
+          <a className="underline underline-offset-2 hover:text-white/70" href="https://www.pexels.com/video/a-man-having-a-haircut-4177954/" target="_blank" rel="noreferrer">
+            Pavel Danilyuk / Pexels
+          </a>
+        </p>
       </div>
 
       <BookingAuthModal
@@ -172,8 +181,11 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         onAuthenticated={(signedIn) => {
           setUser(signedIn);
           setAuthOpen(false);
+          // an authenticated customer belongs in their account, not dumped in
+          // the booking wizard; staff (OWNER/RECEPTIONIST/…) just stay put and
+          // the page re-renders with their panel links.
           router.refresh();
-          router.push("/booking");
+          if (signedIn.role === "CLIENT") router.push("/account");
         }}
         demoPhoneHint={demoPhoneHint}
       />
@@ -181,7 +193,7 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
       <dialog
         ref={contact}
         aria-labelledby="contact-title"
-        className="auth-dialog w-[min(440px,calc(100vw-24px))] rounded-2xl border border-[#e2e5df] bg-white p-6 text-[#1f2e27] shadow-xl"
+        className="auth-dialog w-[min(440px,calc(100vw-24px))] rounded-2xl border border-bone-150 bg-white p-6 text-bone-700 shadow-xl"
         onClick={(e) => { if (e.target === e.currentTarget) contact.current?.close(); }}
       >
         <div className="flex items-center justify-between">
@@ -191,11 +203,27 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
           </button>
         </div>
         <p className="mt-6 flex items-start gap-2 text-sm leading-8">
-          <Icon name="location" className="mt-1 h-5 w-5 text-[#0f5a3b]" />
-          {CONTACT_ADDRESS}
+          <Icon name="location" className="mt-1 h-5 w-5 text-brand-700" />
+          {address}
         </p>
+        {savedContact && savedContact.lat !== null && savedContact.lng !== null && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/neshan/map?lat=${savedContact.lat}&lng=${savedContact.lng}`}
+            alt="موقعیت سالن روی نقشه نشان"
+            loading="lazy"
+            className="mt-4 h-36 w-full rounded-xl border border-bone-150 object-cover"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
+          />
+        )}
+        {directions && (
+          <a href={directions} target="_blank" rel="noreferrer" className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-brand-700 underline underline-offset-4">
+            <Icon name="location" className="h-4 w-4" />
+            مسیریابی با نشان
+          </a>
+        )}
         <p className="mt-3 flex items-center gap-2 text-sm">
-          <Icon name="clock" className="h-5 w-5 text-[#0f5a3b]" />
+          <Icon name="clock" className="h-5 w-5 text-brand-700" />
           {OPENING_HOURS}
         </p>
         <a href={`tel:${CONTACT_PHONE_TEL}`} dir="ltr" className="ui-button mt-6 w-full">

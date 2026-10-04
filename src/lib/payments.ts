@@ -5,6 +5,7 @@ import {
   appointments,
   auditLogs,
   classRegistrations,
+  courseEnrollments,
   notifications,
   payments,
 } from "@/db/schema";
@@ -18,7 +19,12 @@ export async function verifyPayment(reference: string, providerStatus: "OK" | "F
     await tx.execute(sql`select id from payments where reference = ${reference} for update`);
     const [row] = await tx.select().from(payments).where(eq(payments.reference, reference)).limit(1);
     if (!row) return { error: "پرداخت یافت نشد." };
-    if (row.kind !== "APPOINTMENT" && row.kind !== "APPOINTMENT_GROUP" && row.kind !== "CLASS")
+    if (
+      row.kind !== "APPOINTMENT" &&
+      row.kind !== "APPOINTMENT_GROUP" &&
+      row.kind !== "CLASS" &&
+      row.kind !== "COURSE"
+    )
       return { error: "نوع پرداخت نامعتبر است." };
     if (row.status !== "PENDING") {
       const status = row.status === "PAID" || row.status === "FAILED" || row.status === "CANCELLED"
@@ -76,6 +82,15 @@ export async function verifyPayment(reference: string, providerStatus: "OK" | "F
         await tx.update(classRegistrations).set({ status: "CONFIRMED" })
           .where(eq(classRegistrations.id, registration.id));
     }
+    if (row.kind === "COURSE") {
+      const [enrollment] = await tx.select().from(courseEnrollments)
+        .where(eq(courseEnrollments.id, row.refId)).limit(1);
+      if (!enrollment || enrollment.status === "CANCELLED") return { error: "ثبت‌نام این دوره لغو شده است." };
+      if (providerStatus === "OK" && enrollment.status === "PENDING")
+        await tx.update(courseEnrollments)
+          .set({ status: "ACTIVE", updatedAt: new Date() })
+          .where(eq(courseEnrollments.id, enrollment.id));
+    }
     const status = providerStatus === "OK" ? "PAID" : "FAILED";
     await tx.update(payments).set({ status }).where(eq(payments.id, row.id));
     await tx.insert(auditLogs).values({ actor: "verified-payment", action: "PAYMENT_VERIFIED", target: reference });
@@ -83,7 +98,7 @@ export async function verifyPayment(reference: string, providerStatus: "OK" | "F
       await tx.insert(notifications).values({
         targetRole: "SUPER_ADMIN",
         kind: "PAYMENT_RECEIVED",
-        title: `پرداخت ${row.kind === "CLASS" ? "شهریه" : "بیعانه"} دریافت شد`,
+        title: `پرداخت ${row.kind === "CLASS" || row.kind === "COURSE" ? "شهریه" : "بیعانه"} دریافت شد`,
         body: `${reference} — ${row.amount.toLocaleString("fa-IR")} تومان`,
       });
       if (row.kind === "APPOINTMENT" || row.kind === "APPOINTMENT_GROUP") {

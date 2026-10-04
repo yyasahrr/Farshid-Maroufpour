@@ -25,6 +25,7 @@
   /* neutral ramp */
   --color-bone-50: #fdfcf9;
   --color-bone-100: #f6f5f1;
+  --color-bone-150: #e2e5df;
   --color-bone-200: #edece8;
   --color-bone-300: #e5e0d4;
   --color-bone-500: #59636b;
@@ -40,10 +41,14 @@
   --color-brand-600: #14432f;
   --color-brand-700: #0f5a3b;
   --color-brand-800: #0b4a30;
+  --color-brand-900: #10261b;
+  --color-brand-950: #07170f;
 
   /* brass ramp — second accent, earns its place on price and shop surfaces */
   --color-brass-50: #f7f0d8;
   --color-brass-200: #eadfb8;
+  --color-brass-400: #c59b4b;
+  --color-brass-600: #855e16;
   --color-brass-700: #6b5213;
   --color-brass-800: #8a6a1e;
 
@@ -74,9 +79,14 @@
   --color-brass-text: #6b5213;
   --color-success: #2e7d4f;
   --color-warning: #8a6a1e;
+  --color-warning-soft: #f7f0d8;
   --color-danger: #9f3b4c;
+  --color-danger-soft: #f8ecee;
+  --color-accent-line: #bfd9d1;
   --color-booking: #0f5a3b;
   --color-academy: #3f5548;
+  --color-class: #424874;
+  --color-class-soft: #e8eaf6;
   --color-shop: #f7f0d8;
 
   /* Structural separators. These are borders on purpose: they carry layout
@@ -171,6 +181,44 @@ button:disabled {
   outline: 2px solid var(--color-action-primary);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* a11y: skip link — hidden until focused (top end flips with dir automatically) */
+.skip-link {
+  visibility: hidden;
+  position: fixed;
+  top: 10px;
+  inset-inline-start: 10px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--color-brand-700);
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-200%);
+  transition: transform 150ms ease-out;
+}
+.skip-link:focus-visible {
+  visibility: visible;
+  transform: none;
+}
+
+/* iOS/Safari zoom-on-focus guard: small text inputs get a 16px floor on phones */
+@media (max-width: 767px) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):is([class*="text-xs"], [class*="text-sm"], [class*="text-["]) {
+    font-size: 16px;
+  }
+}
+
+/* Typography: balanced heads, pretty prose (graceful no-op on old engines) */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+.ui-shell p,
+main p {
+  text-wrap: pretty;
 }
 
 /* ---------- shell ---------- */
@@ -597,10 +645,18 @@ img.no-outline {
   transition-duration: var(--duration-fast);
   transition-timing-function: ease-out;
 }
+/* The booking card previews its destination: the dark-premium theme of /booking,
+   brass kept for the moment of focus — not painted over everything. */
+/* Booking is the primary path, so it reads as the site's own action color on
+   the cream landing — green edge + white surface, exactly the ui-card/CTA
+   family used everywhere else. No dark island. */
 .bento-shortcut-booking {
-  background: #0f5a3b;
-  color: #fff;
-  border: 1px solid #7fc9a6;
+  background: #ffffff;
+  color: #1a2e25;
+  border: 1px solid rgba(15, 90, 59, 0.32);
+}
+.bento-shortcut-booking:hover {
+  border-color: rgba(15, 90, 59, 0.6);
 }
 .bento-shortcut-academy {
   background: #e3f0e9;
@@ -714,6 +770,52 @@ img.no-outline {
   backdrop-filter: blur(3px);
 }
 
+/* Dialog choreography (entrance + exit via allow-discrete). Kept in CSS — the
+   dialogs stay native <dialog> so focus trap / Esc / inert semantics from the
+   modal-logic JS remain untouched. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-dialog,
+  .policy-dialog {
+    opacity: 0;
+    transform: scale(0.965);
+    transition:
+      opacity 0.2s ease-out,
+      transform 0.2s ease-out,
+      overlay 0.2s ease-out allow-discrete,
+      display 0.2s ease-out allow-discrete;
+  }
+  .auth-dialog[open],
+  .policy-dialog[open] {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    .auth-dialog[open],
+    .policy-dialog[open] {
+      opacity: 0;
+      transform: scale(0.965);
+    }
+  }
+  .auth-dialog::backdrop,
+  .policy-dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 0.24s ease-out,
+      overlay 0.24s ease-out allow-discrete,
+      display 0.24s ease-out allow-discrete;
+  }
+  .auth-dialog[open]::backdrop,
+  .policy-dialog[open]::backdrop {
+    opacity: 1;
+  }
+  @starting-style {
+    .auth-dialog[open]::backdrop,
+    .policy-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+
 @media (max-width: 639px) {
   .policy-dialog,
   .auth-dialog {
@@ -723,6 +825,648 @@ img.no-outline {
     border-radius: 24px 24px 0 0;
     padding-bottom: max(24px, env(safe-area-inset-bottom));
   }
+  @media (prefers-reduced-motion: no-preference) {
+    .auth-dialog[open],
+    .policy-dialog[open] {
+      transform: none;
+    }
+    .auth-dialog:not([open]),
+    .policy-dialog:not([open]) {
+      transform: translateY(24px);
+    }
+    @starting-style {
+      .auth-dialog[open],
+      .policy-dialog[open] {
+        transform: translateY(24px);
+      }
+    }
+  }
+}
+
+
+
+/* ---------- booking wizard (theme-token surfaces) ----------
+   Rows, switches and chips are token-driven so the customer shell and the
+   operations shell can re-skin the same components by swapping variables. */
+
+.bk-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.bk-row-on {
+  border-color: var(--color-action-primary);
+  background: var(--color-accent-soft);
+}
+.bk-row-disabled {
+  opacity: 0.6;
+}
+
+/* signature toggle: real switch semantics (role="switch"), never icon-only */
+.bk-switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-sunken);
+  transition: background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+.bk-switch[data-on="true"] {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+}
+.bk-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.bk-switch-thumb {
+  position: absolute;
+  inset-inline-start: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: translate var(--duration-fast) var(--ease-enter);
+}
+.bk-switch[data-on="true"] .bk-switch-thumb {
+  translate: 22px 0;
+}
+[dir="rtl"] .bk-switch[data-on="true"] .bk-switch-thumb {
+  translate: -22px 0;
+}
+.bk-switch:focus-visible {
+  outline: 2px solid var(--color-action-primary);
+  outline-offset: 3px;
+}
+
+.bk-day {
+  flex: 0 0 auto;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.bk-day-on {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-bg);
+}
+
+.bk-time {
+  min-width: 74px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
+    transform 120ms var(--ease-enter);
+}
+.bk-time:not(:disabled):hover {
+  border-color: var(--color-action-primary);
+}
+.bk-time:not(:disabled):active {
+  transform: scale(0.98);
+}
+.bk-time-on {
+  background: var(--color-action-primary);
+  border-color: var(--color-action-primary);
+  color: var(--color-bg);
+}
+.bk-time:disabled {
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+.bk-seg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--color-surface-sunken);
+  border: 1px solid transparent;
+}
+
+.bk-sticky {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+@media (min-width: 640px) {
+  .bk-sticky {
+    position: static;
+    margin-top: 24px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 14px 16px;
+    background: var(--color-surface);
+    backdrop-filter: none;
+  }
+}
+
+/* ---------- live salon timeline ---------- */
+
+.bk-tl-block {
+  margin-block: 3px;
+  border-radius: 8px;
+  padding: 3px 6px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+}
+.bk-tl-booking {
+  background: var(--color-action-primary);
+  color: var(--color-bg);
+}
+.bk-tl-pending {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  border-color: var(--color-warning);
+  border-style: dashed;
+}
+.bk-tl-hold {
+  background: transparent;
+  border-color: var(--color-action-primary); /* stroke keeps the fill jade */
+  border-style: dashed;
+  color: var(--color-action-text); /* text role: 11px jade was Lc -43, now -76 */
+}
+.bk-tl-class {
+  background: var(--color-class-soft);
+  color: var(--color-class);
+}
+.bk-tl-block-kind,
+.bk-tl-block {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-muted);
+}
+.bk-tl-break {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--color-surface-sunken),
+    var(--color-surface-sunken) 6px,
+    var(--color-border) 6px,
+    var(--color-border) 7px
+  );
+  color: var(--color-text-muted);
+}
+
+
+/* ============================================================
+   Scoped themes. One token swap re-skins every component that
+   reads the semantic roles; nothing here is invented locally.
+   ============================================================ */
+
+/* Customer booking runs on the SAME light tokens as every public surface
+   (:root swap) — the wizard, dialogs and cards read --color-* roles, so one
+   theme governs landing → booking → pay. No scoped dark override here. */
+
+/* Operations shell (admin / staff) — v2, «اتاق فرمانِ امروز».
+   One token source; every ops surface reads it. Legacy patches below exist so
+   pages that still carry light-theme utility classes collapse onto the dark
+   system honestly instead of fighting it. New markup uses .ops-* primitives. */
+.theme-ops {
+  color-scheme: dark; /* native widgets (date pickers, select popups, scrollbars) follow the shell */
+  --color-bg: #0f1110;
+  --color-surface: #171a18;
+  --color-surface-sunken: #121413;
+  --color-text-primary: #f1f0ea;
+  --color-text-secondary: #c4cac4;
+  --color-text-muted: #b3bcb3; /* APCA -64 on surface; #8a938b was -42, below the 60 floor for 11px meta */
+  --color-action-primary: #2fa37b;
+  --color-action-text: #8fdcbc; /* jade for TEXT on dark (Lc -76); fills keep action-primary */
+  --color-action-primary-hover: #3ab88c;
+  --color-action-ink: #08120d;
+  --color-accent-soft: rgba(47, 163, 123, 0.16);
+  --color-accent-line: rgba(47, 163, 123, 0.4);
+  --color-border: #262b28;
+  --color-border-strong: #383f3a;
+  --color-class: #9aa3d6;
+  --color-class-soft: rgba(66, 72, 116, 0.35);
+  --color-warning: #e6c98a;
+  --color-warning-soft: rgba(217, 179, 100, 0.12);
+  --color-warning-line: rgba(230, 201, 138, 0.3);
+  --color-danger: #e9a9b2; /* was #e09aa3 (Lc -57 < 60 floor) */
+  --color-danger-soft: rgba(191, 84, 99, 0.14);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+}
+/* Legacy utility-class patches for pages that still carry light-theme
+   classes (barber panel, admin sub-panels). Written as [class~="…"] attribute
+   selectors on purpose: Tailwind's escaped forms (\\:) survive PostCSS here only by
+   luck; attribute matching is exact and needs no escaping. */
+.theme-ops .glass-card,
+.theme-ops .glass-floating,
+.theme-ops .glass-subtle {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.theme-ops [class~="bg-white"],
+.theme-ops [class~="bg-white/70"],
+.theme-ops [class~="bg-white/80"],
+.theme-ops [class~="bg-white/90"],
+.theme-ops [class~="bg-white/95"] {
+  background: var(--color-surface-sunken) !important;
+  color: var(--color-text-primary) !important;
+}
+.theme-ops [class~="hover:bg-white/90"]:hover {
+  background: var(--color-surface) !important;
+}
+.theme-ops [class~="border-[#c59b4b]"],
+.theme-ops [class~="border-[#c59b4b]/10"],
+.theme-ops [class~="border-[#c59b4b]/15"],
+.theme-ops [class~="border-[#c59b4b]/20"],
+.theme-ops [class~="border-[#c59b4b]/25"],
+.theme-ops [class~="border-[#c59b4b]/30"],
+.theme-ops [class~="border-[#c59b4b]/40"] {
+  border-color: var(--color-border) !important;
+}
+.theme-ops [class~="divide-[#c59b4b]/10"] > *,
+.theme-ops [class~="divide-[#c59b4b]/15"] > *,
+.theme-ops [class~="divide-[#c59b4b]/20"] > * {
+  border-color: var(--color-border) !important;
+}
+.theme-ops input,
+.theme-ops select,
+.theme-ops textarea {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+.theme-ops option {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+.theme-ops [class~="text-[#0f5a3b]"] {
+  color: var(--color-action-text) !important;
+}
+.theme-ops [class~="text-[#855e16]"],
+.theme-ops [class~="text-[#8a6a1e]"] {
+  color: var(--color-warning) !important;
+}
+/* Legacy tints → semantic equivalents (light chips on dark read as noise). */
+.theme-ops [class~="bg-[#0f5a3b]"] {
+  background: var(--color-action-primary) !important;
+  color: var(--color-action-ink) !important;
+}
+.theme-ops [class~="bg-[#0f5a3b]/10"] {
+  background: var(--color-accent-soft) !important;
+}
+.theme-ops [class~="hover:bg-[#094028]"]:hover,
+.theme-ops [class~="hover:bg-[#0f5a3b]"]:hover {
+  background: var(--color-action-primary-hover) !important;
+}
+.theme-ops [class~="bg-[#c59b4b]"] {
+  background: var(--color-warning) !important;
+}
+.theme-ops [class~="bg-[#c59b4b]/15"] {
+  background: var(--color-warning-soft) !important;
+}
+.theme-ops [class~="hover:bg-[#c59b4b]"]:hover {
+  background: var(--color-warning) !important;
+  color: var(--color-action-ink) !important;
+}
+.theme-ops [class~="bg-[#e4ece3]"],
+.theme-ops [class~="bg-[#e2efe8]"] {
+  background: var(--color-accent-soft) !important;
+  color: var(--color-action-text) !important;
+}
+.theme-ops [class~="bg-[#f7f0d8]"] {
+  background: var(--color-warning-soft) !important;
+  color: var(--color-warning) !important;
+}
+.theme-ops [class~="bg-rose-50"] {
+  background: var(--color-danger-soft) !important;
+}
+.theme-ops [class~="text-rose-700"] {
+  color: var(--color-danger) !important;
+}
+.theme-ops [class~="border-rose-200"],
+.theme-ops [class~="border-rose-300"] {
+  border-color: rgba(224, 154, 163, 0.32) !important;
+}
+.theme-ops [class~="hover:bg-rose-100"]:hover {
+  background: var(--color-danger-soft) !important;
+}
+.theme-ops [class~="border-[#0f5a3b]/25"],
+.theme-ops [class~="border-[#0f5a3b]/30"] {
+  border-color: var(--color-accent-line) !important;
+}
+.theme-ops [class~="bg-[#0f5a3b]"][class~="text-white"],
+.theme-ops [class~="bg-[#0f5a3b]"] [class~="text-white"],
+.theme-ops [class~="hover:bg-[#c59b4b]"][class~="text-white"] {
+  color: var(--color-action-ink) !important;
+}
+/* Green/gold legacy buttons inside the ops shell carry dark ink for contrast —
+   scoped to that pairing so legitimate white text elsewhere stays white. */
+
+/* ---- ops primitives (v2 markup) ---- */
+.ops-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: clamp(16px, 2.4vw, 26px);
+  scroll-margin-top: 88px;
+}
+.ops-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 18px;
+}
+.ops-panel-head h2 {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--color-text-primary);
+}
+.ops-panel-desc {
+  margin-top: 6px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--color-text-muted);
+  max-width: 62ch;
+}
+.ops-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.ops-strip > div {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ops-strip > div + div {
+  border-inline-start: 1px solid var(--color-border);
+}
+.ops-strip .ops-num {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+.ops-strip .ops-cap {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.ops-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+.ops-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-action-primary);
+  border-radius: 999px;
+}
+.ops-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.ops-chip-ok {
+  color: var(--color-action-text);
+  background: rgba(47, 163, 123, 0.14);
+  border-color: var(--color-accent-line);
+}
+.ops-chip-wait {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border-color: var(--color-warning-line);
+}
+.ops-chip-bad {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  border-color: rgba(224, 154, 163, 0.3);
+}
+.ops-chip-mute {
+  color: var(--color-text-muted);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
+}
+.ops-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ops-table th {
+  text-align: start;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.ops-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.ops-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.ops-table tbody tr:hover {
+  background: var(--color-surface-sunken);
+}
+.ops-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  background: var(--color-action-primary);
+  color: var(--color-action-ink);
+  font-weight: 700;
+  font-size: 12.5px;
+  border-radius: 10px;
+  padding: 8px 16px;
+  transition: background 0.12s ease-out, transform 0.12s ease-out;
+}
+.ops-btn:hover {
+  background: var(--color-action-primary-hover);
+}
+.ops-btn:active {
+  transform: scale(0.98);
+}
+.ops-btn:disabled {
+  background: var(--color-border-strong);
+  color: var(--color-text-muted);
+  cursor: wait;
+}
+.ops-btn-quiet {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+.ops-btn-quiet:hover {
+  border-color: var(--color-action-primary);
+  color: var(--color-text-primary);
+  background: var(--color-accent-soft);
+}
+.ops-btn-danger {
+  background: transparent;
+  border: 1px solid rgba(224, 154, 163, 0.35);
+  color: var(--color-danger);
+}
+.ops-btn-danger:hover {
+  background: var(--color-danger-soft);
+}
+.ops-field {
+  width: 100%;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-primary);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.ops-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.ops-form {
+  border-top: 1px dashed var(--color-border-strong);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.ops-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.ops-link {
+  color: var(--color-action-text);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.ops-link:hover {
+  text-decoration: underline;
+}
+.ops-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.ops-num {
+  font-variant-numeric: tabular-nums;
+}
+.ops-ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+}
+.ops-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ops-nav .ops-group-label {
+  margin: 14px 12px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+.ops-nav .ops-group-label:first-child {
+  margin-top: 0;
+}
+.ops-nav a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition: background 0.12s ease-out, color 0.12s ease-out;
+}
+.ops-nav a:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-text-primary);
+}
+.ops-count {
+  margin-inline-start: auto;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning-line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.ops-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.ops-row + .ops-row {
+  margin-top: 8px;
+}
+.ops-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ---------- reduced motion ---------- */

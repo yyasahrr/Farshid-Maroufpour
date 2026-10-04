@@ -1,59 +1,83 @@
 {
   "version": 1,
   "skills": {
+    "banner-design": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/banner-design/SKILL.md",
+      "computedHash": "1bb85d0bfec06e23578739a476c181b17c4db694c341da4e603e43183a4b42d3"
+    },
     "better-accessibility": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-accessibility/SKILL.md",
-      "computedHash": "6b7ce68b54e8899f2678d47b0cc772c4aeb9ce178a2eec93c945948c1b044f19"
+      "computedHash": "019387b6da56d6f46a7c0f31ca274075a7c2592aed8289b53e89533d068c2d09"
     },
     "better-colors": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-colors/SKILL.md",
-      "computedHash": "47c25cca097d0993190ca12b416ec0be08429d8086d99adcac4621aa0e1f110f"
+      "computedHash": "1a6ff21c2ee760744f119cf6166df95ab4d05335c771c04a2ecb4c49cbbe5f1c"
     },
     "better-interface": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-interface/SKILL.md",
-      "computedHash": "c7a2c30c0b13709b2fa7e4210eef55907d8887017c15ea43478752db4f935fbf"
+      "computedHash": "406267c5782510d658a914899db2fc5eb3f5f7d51620cc4c86d7e26b217fdf24"
     },
     "better-layout": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-layout/SKILL.md",
-      "computedHash": "c8d251ca0542cd92996b70d86d573e3972ba99fd23f5161d0b3ddf642516802e"
+      "computedHash": "cb369bccb6a337c6fd2344dacccae0d1e12a1fb85b6eb9e726b76b18a95f16d6"
     },
     "better-typography": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-typography/SKILL.md",
-      "computedHash": "3fb90fed3aeb57a6a545be4e4f285f0d1babdaff9644ec3526857437481747a1"
+      "computedHash": "342f0e90fe46fd8a0111682ebd7e1ce526ede636d1a14d867d8dd3e2803670af"
     },
     "better-ui": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-ui/SKILL.md",
-      "computedHash": "907e6137d2019fe2b7de2357246ad8041d1b8318ba5c085cd0cb560ebb97025a"
+      "computedHash": "d05cf568f197e47b15e71e21b19be1897eba2bf187ef7b0a341bc5ffaf3ffd4d"
     },
     "better-writing": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/better-writing/SKILL.md",
-      "computedHash": "a66da2a345b8e0c220841665c261cc9776c293fdb5d22f5165a98d0e7c790841"
+      "computedHash": "225768480d8ba9cf6d00bb728d2a34dfb430d2134e25fc02dcedbba086b3bc5f"
+    },
+    "brand": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/brand/SKILL.md",
+      "computedHash": "c5629242f72a17425456f684467a6fb7fb4a03f1fcfe1474e87aabad78ddae65"
     },
     "break": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/break/SKILL.md",
-      "computedHash": "908cb0db20a827e5e4862e700a8cb000d0979c8938b224f5f5e699b096d3e094"
+      "computedHash": "528ebeb92997f30092b8c59a57944970febe4c84d3675d05e87432441c6f6832"
     },
     "build-awwwards-quality-sites": {
       "source": "MengTo/skills",
       "sourceType": "github",
       "skillPath": "agent-skills/web-design/build-awwwards-quality-sites/SKILL.md",
       "computedHash": "64017fdb07bf9b015ed25c4f286cde2238ab14b44e9a22ce2330167ee861f547"
+    },
+    "design": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/design/SKILL.md",
+      "computedHash": "5323cb84852303e2cbd76c909e3165a3b63f4e4f81a85ab0a549481fc3d5f86f"
+    },
+    "design-system": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/design-system/SKILL.md",
+      "computedHash": "c50a1a77394e988b2593ed97f95ae28b5167eb8a826385b5996d67e398d15b6a"
     },
     "emil-design-eng": {
       "source": "emilkowalski/skill",
@@ -65,19 +89,37 @@
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/explain-interface/SKILL.md",
-      "computedHash": "e30c30938fce98dcf8156c083f89b8015e3042f460bb9228dedeac8e4a8df557"
+      "computedHash": "c070d4c7d530011d572b18bf86ddff9cd7493942379deca7eb63aae1d99df17c"
     },
     "interface-review": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/interface-review/SKILL.md",
-      "computedHash": "e8575144eb155448757a82a3b89825c87045a85ca2ed3bd9131c53fc9682c8a5"
+      "computedHash": "692fc5f2cfc2ad08951ea68ee6f5db9c99b759fa46b18e53101cd50d51a94f3a"
+    },
+    "slides": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/slides/SKILL.md",
+      "computedHash": "9c012d14e94b734b324f859d64da3b47762b8cdee47515ce83bce4366222f885"
+    },
+    "ui-styling": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-styling/SKILL.md",
+      "computedHash": "39ad392c96adab936d8d057b66d1d632dd9c3d2b2397ec11bfe0e2a7c1fc975a"
+    },
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "computedHash": "27b1e8c953e26f962e3314281601959b04787edf3fd7fccadce176ff844c688d"
     },
     "variant": {
       "source": "jakubkrehel/skills",
       "sourceType": "github",
       "skillPath": "skills/variant/SKILL.md",
-      "computedHash": "9d6d18d4305ff7f46e2120c05596986800780fee069ac978c94d60b587cb80cc"
+      "computedHash": "d66d7c9a0b7c7ee12b7a7cacefebe4234a45284372b2fb6e7ddc1342ffca0f69"
     }
   }
 }

@@ -63,7 +63,7 @@ export function HomeHero() {
     <section
       id="home-hero"
       aria-labelledby="home-hero-title"
-      className="home-hero relative isolate min-h-[100svh] overflow-hidden bg-[#10261b] text-white"
+      className="home-hero relative isolate min-h-[100svh] overflow-hidden bg-brand-900 text-white"
     >
       <video
         ref={videoRef}
@@ -87,7 +87,7 @@ export function HomeHero() {
       </video>
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-l from-[#07170f]/85 via-[#07170f]/55 to-[#07170f]/35"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-l from-brand-950/85 via-brand-950/55 to-brand-950/35"
       />
       <div className="home-hero-inner ui-container relative z-10 grid min-h-[100svh] content-center items-center gap-6 pt-24 pb-36 md:grid-cols-[0.9fr_1.1fr] md:gap-8 md:py-28 xl:gap-14">
         <div data-reveal="" className="min-w-0 max-w-xl text-right">
@@ -103,13 +103,13 @@ export function HomeHero() {
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href="/booking"
-              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 text-sm font-bold text-[#10261b] transition-colors hover:bg-[#e3f0e9]"
+              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 text-sm font-bold text-brand-900 transition-colors hover:bg-brand-50"
             >
               رزرو نوبت
             </Link>
             <Link
               href="#services"
-              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border border-white/70 bg-[#10261b]/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/15"
+              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border border-white/70 bg-brand-900/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/15"
             >
               دیدن خدمات
             </Link>
@@ -124,7 +124,7 @@ export function HomeHero() {
         onClick={() => void togglePlayback()}
         aria-label={isPlaying ? "توقف ویدئوی معرفی سالن" : "پخش ویدئوی معرفی سالن"}
         aria-pressed={isPlaying}
-        className="focus-ring absolute bottom-24 left-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/60 bg-[#10261b]/75 px-4 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-[#10261b] md:bottom-6 md:left-6"
+        className="focus-ring absolute bottom-24 left-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/60 bg-brand-900/75 px-4 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-brand-900 md:bottom-6 md:left-6"
       >
         <Icon name={isPlaying ? "pause" : "play"} className="h-4 w-4" weight="strong" />
         {isPlaying ? "توقف ویدئو" : "پخش ویدئو"}
@@ -132,7 +132,7 @@ export function HomeHero() {
       <a
         href="#about"
         aria-label="رفتن به بخش بعدی"
-        className="home-hero-scroll focus-ring absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 rounded-full border border-white/30 bg-[#07170f]/55 px-4 py-2 text-xs font-semibold text-white backdrop-blur-sm md:bottom-5"
+        className="home-hero-scroll focus-ring absolute bottom-24 left-1/2 z-20 flex -translate-x-1/2 flex-col items-center gap-1 rounded-full border border-white/30 bg-brand-950/55 px-4 py-2 text-xs font-semibold text-white backdrop-blur-sm md:bottom-5"
       >
         <span>ادامه</span>
         <Icon name="chevron" aria-hidden="true" className="h-5 w-5" />

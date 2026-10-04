@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { clearSessionCookie, landingPathFor, setSessionCookie, type Role } from "@/lib/session";
+import { clearSessionCookie, landingPathFor, loadSessionUser, setSessionCookie } from "@/lib/session";
 import { hashPassword, needsRehash, verifyPassword } from "@/lib/passwords";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -33,7 +33,8 @@ export async function loginAction(_prev: string | null, formData: FormData): Pro
     await db.update(users).set({ passwordHash: hashPassword(parsed.data.password) }).where(eq(users.id, user.id));
   }
   await setSessionCookie(user.id);
-  redirect(landingPathFor(user.role as Role));
+  const sessionUser = await loadSessionUser(user.id);
+  redirect(sessionUser ? landingPathFor(sessionUser) : "/");
 }
 
 export async function logoutAction() {

@@ -76,22 +76,22 @@ export function MobileNav() {
                 aria-current={isCurrent ? "page" : undefined}
                 className={
                   item.primary
-                    ? "focus-ring relative -mt-7 flex min-h-[76px] min-w-0 flex-col items-center justify-end gap-1 rounded-2xl px-0.5 pb-0.5 text-center text-[9px] font-extrabold leading-tight text-[#1f2e27] motion-safe:transition-[scale] motion-safe:duration-100 motion-safe:active:scale-[0.96]"
+                    ? "focus-ring relative -mt-7 flex min-h-[76px] min-w-0 flex-col items-center justify-end gap-1 rounded-2xl px-0.5 pb-0.5 text-center text-[9px] font-extrabold leading-tight text-bone-700 motion-safe:transition-[scale] motion-safe:duration-100 motion-safe:active:scale-[0.96]"
                     : `focus-ring flex min-h-12 min-w-0 max-w-16 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 text-[10px] font-bold leading-tight motion-safe:transition-[background-color,color,scale] motion-safe:duration-150 motion-safe:active:scale-[0.96] ${
                         isCurrent
-                          ? "bg-[#e3f0e9] text-[#0f5a3b]"
-                          : "text-[#535e66] hover:bg-[#f6f5f1]"
+                          ? "bg-brand-50 text-brand-700"
+                          : "text-[#535e66] hover:bg-bone-100"
                       }`
                 }
               >
                 {item.primary ? (
-                  <span className={`grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full border-[5px] border-[#fdfcf9] bg-[#0f5a3b] text-white shadow-[0_7px_18px_-5px_rgba(15,90,59,0.48),0_2px_5px_rgba(15,46,37,0.12)] ring-1 motion-safe:transition-[background-color,box-shadow,ring-color] motion-safe:duration-150 ${isCurrent ? "ring-[#0f5a3b]" : "ring-[#dfe7e1]"}`}>
+                  <span className={`grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full border-[5px] border-bone-50 bg-brand-700 text-white shadow-[0_7px_18px_-5px_rgba(15,90,59,0.48),0_2px_5px_rgba(15,46,37,0.12)] ring-1 motion-safe:transition-[background-color,box-shadow,ring-color] motion-safe:duration-150 ${isCurrent ? "ring-brand-700" : "ring-[#dfe7e1]"}`}>
                     <Icon name={item.icon} className="!h-6 !w-6" />
                   </span>
                 ) : (
                   <Icon
                     name={item.icon}
-                    className={`!h-5 !w-5 ${isCurrent ? "text-[#0f5a3b]" : ""}`}
+                    className={`!h-5 !w-5 ${isCurrent ? "text-brand-700" : ""}`}
                   />
                 )}
                 <span className="max-w-full whitespace-nowrap">{item.label}</span>

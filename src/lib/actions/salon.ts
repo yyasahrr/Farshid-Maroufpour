@@ -9,15 +9,20 @@ import {
   auditLogs,
   barberSchedule,
   barberServices,
+  barberSkills,
   barbers,
   blockedTimes,
+  classSessions,
   classes,
   notifications,
   salonSchedule,
+  serviceCombinationRules,
   services,
+  userRoles,
   users,
 } from "@/db/schema";
 import { getCurrentUser, isStaff, type SessionUser } from "@/lib/session";
+import { Permission } from "@/lib/rbac";
 import { hashPassword } from "@/lib/passwords";
 import { isValidISODate } from "@/lib/time";
 
@@ -26,16 +31,23 @@ export type ActionResult = { ok: boolean; message: string };
 const ok = (message: string): ActionResult => ({ ok: true, message });
 const fail = (message: string): ActionResult => ({ ok: false, message });
 
+/** Permission-based gate: roles live in user_roles, not a single column. */
+async function requirePermission(permission: Permission): Promise<SessionUser | null> {
+  const user = await getCurrentUser();
+  if (!user || !user.permissions.has(permission)) return null;
+  return user;
+}
+
 async function requireAdmin(): Promise<SessionUser | null> {
   const user = await getCurrentUser();
-  return user && user.role === "SUPER_ADMIN" ? user : null;
+  return user && user.roles.includes("SUPER_ADMIN") ? user : null;
 }
 
 async function requireBarberAccess(barberId: number): Promise<SessionUser | null> {
   const user = await getCurrentUser();
   if (!user) return null;
-  if (user.role === "SUPER_ADMIN") return user;
-  if (user.role === "BARBER" && user.barberId === barberId) return user;
+  if (user.permissions.has("staff:manage")) return user; // manager/owner may edit anyone
+  if (user.roles.includes("BARBER") && user.barberId === barberId) return user;
   return null;
 }
 
@@ -351,7 +363,7 @@ export async function updateAppointmentStatusAction(formData: FormData): Promise
   if (!row) return;
   const user = await getCurrentUser();
   if (!user) return;
-  const allowed = isStaff(user.role) || (user.role === "BARBER" && user.barberId === row.barberId);
+  const allowed = isStaff(user) || (user.roles.includes("BARBER") && user.barberId === row.barberId);
   if (!allowed) return;
   await db.update(appointments).set({ status }).where(eq(appointments.id, id));
   await audit(`user:${user.id}`, "APPOINTMENT_STATUS_CHANGED", `appointment:${id}:${status}`);
@@ -404,4 +416,210 @@ export async function createClassAction(
   revalidatePath("/admin");
   revalidatePath("/academy");
   return ok("دوره ایجاد شد.");
+}
+
+/* ---------- Skill approval (skills are claims; management approves) ---------- */
+
+const SkillClaimSchema = z.object({
+  barberId: z.coerce.number().int().positive(),
+  skillId: z.coerce.number().int().positive(),
+});
+
+/** A barber claims a skill for themselves: it lands as PENDING, never self-approved. */
+export async function requestSkillAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = SkillClaimSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail("داده نامعتبر است.");
+  const user = await requireBarberAccess(parsed.data.barberId);
+  if (!user) return fail("دسترسی غیرمجاز.");
+  try {
+    await db
+      .insert(barberSkills)
+      .values({
+        barberId: parsed.data.barberId,
+        skillId: parsed.data.skillId,
+        status: "PENDING",
+      })
+      .onConflictDoUpdate({
+        target: [barberSkills.barberId, barberSkills.skillId],
+        set: { status: "PENDING", approvedBy: null, approvedAt: null },
+      });
+  } catch {
+    return fail("مهارت یافت نشد.");
+  }
+  await audit(`user:${user.id}`, "SKILL_CLAIMED", `barber:${parsed.data.barberId}:skill:${parsed.data.skillId}`);
+  revalidatePath("/barber");
+  revalidatePath("/admin");
+  return ok("درخواست ثبت شد و در انتظار تأیید مدیریت است.");
+}
+
+const SkillDecisionSchema = z.object({
+  membershipId: z.coerce.number().int().positive(),
+  decision: z.enum(["APPROVE", "REJECT"]),
+});
+
+export async function decideSkillAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = SkillDecisionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail("داده نامعتبر است.");
+  const manager = await requirePermission("skills:approve");
+  if (!manager) return fail("دسترسی غیرمجاز.");
+  const update =
+    parsed.data.decision === "APPROVE"
+      ? { status: "APPROVED", approvedBy: manager.id, approvedAt: new Date() }
+      : { status: "REJECTED", approvedBy: manager.id, approvedAt: new Date() };
+  const [row] = await db
+    .update(barberSkills)
+    .set(update)
+    .where(eq(barberSkills.id, parsed.data.membershipId))
+    .returning({ barberId: barberSkills.barberId });
+  if (!row) return fail("درخواست یافت نشد.");
+  await db.insert(notifications).values({
+    targetRole: "BARBER",
+    kind: "SKILL_DECISION",
+    title: parsed.data.decision === "APPROVE" ? "مهارت شما تأیید شد" : "مهارت شما تأیید نشد",
+    body:
+      parsed.data.decision === "APPROVE"
+        ? "این مهارت از این پس در زمان‌بندی نوبت‌ها فعال است."
+        : "برای بررسی بیشتر با مدیر سالن گفت‌وگو کنید.",
+  });
+  await audit(`user:${manager.id}`, `SKILL_${parsed.data.decision}`, `membership:${parsed.data.membershipId}`);
+  revalidatePath("/admin");
+  revalidatePath("/barber");
+  return ok(parsed.data.decision === "APPROVE" ? "مهارت تأیید شد." : "مهارت رد شد.");
+}
+
+/** Manager removes a skill link entirely (revoke). */
+export async function revokeSkillAction(formData: FormData): Promise<void> {
+  const membershipId = Number(formData.get("membershipId"));
+  if (!Number.isInteger(membershipId)) return;
+  const manager = await requirePermission("skills:approve");
+  if (!manager) return;
+  await db.delete(barberSkills).where(eq(barberSkills.id, membershipId));
+  revalidatePath("/admin");
+  revalidatePath("/barber");
+}
+
+/* ---------- Service combination rules (data-driven, admin UI) ---------- */
+
+const CombinationRuleSchema = z.object({
+  serviceAId: z.coerce.number().int().positive(),
+  serviceBId: z.coerce.number().int().positive(),
+  canCombine: z.union([z.literal("on"), z.undefined()]).optional(),
+  sameBarberRequired: z.union([z.literal("on"), z.undefined()]).optional(),
+  note: z.string().trim().max(200).optional().default(""),
+});
+
+export async function upsertCombinationRuleAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = CombinationRuleSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail("داده نامعتبر است.");
+  const { serviceAId, serviceBId } = parsed.data;
+  if (serviceAId === serviceBId) return fail("یک خدمت با خودش ترکیب نمی‌شود.");
+  const manager = await requirePermission("services:manage");
+  if (!manager) return fail("دسترسی غیرمجاز.");
+  const [a, b] = serviceAId < serviceBId ? [serviceAId, serviceBId] : [serviceBId, serviceAId];
+  await db
+    .insert(serviceCombinationRules)
+    .values({
+      serviceAId: a,
+      serviceBId: b,
+      canCombine: parsed.data.canCombine === "on",
+      sameBarberRequired: parsed.data.sameBarberRequired === "on",
+      note: parsed.data.note ?? "",
+    })
+    .onConflictDoUpdate({
+      target: [serviceCombinationRules.serviceAId, serviceCombinationRules.serviceBId],
+      set: {
+        canCombine: parsed.data.canCombine === "on",
+        sameBarberRequired: parsed.data.sameBarberRequired === "on",
+        note: parsed.data.note ?? "",
+      },
+    });
+  await audit(`user:${manager.id}`, "COMBINATION_RULE_SAVED", `${a}:${b}`);
+  revalidatePath("/admin");
+  return ok("قانون ترکیب ذخیره شد.");
+}
+
+export async function deleteCombinationRuleAction(formData: FormData): Promise<void> {
+  const id = Number(formData.get("ruleId"));
+  if (!Number.isInteger(id)) return;
+  const manager = await requirePermission("services:manage");
+  if (!manager) return;
+  await db.delete(serviceCombinationRules).where(eq(serviceCombinationRules.id, id));
+  revalidatePath("/admin");
+}
+
+/* ---------- Roles & permissions (multi-role membership) ---------- */
+
+const RoleMembershipSchema = z.object({
+  userId: z.coerce.number().int().positive(),
+  role: z.enum(["CLIENT", "TRAINEE", "BARBER", "INSTRUCTOR", "RECEPTIONIST", "MANAGER", "FINANCE", "SUPER_ADMIN"]),
+  action: z.enum(["GRANT", "REVOKE"]),
+});
+
+export async function setRoleMembershipAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = RoleMembershipSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail("داده نامعتبر است.");
+  const owner = await requirePermission("roles:manage");
+  if (!owner) return fail("دسترسی غیرمجاز.");
+  if (parsed.data.userId === owner.id && parsed.data.role === "SUPER_ADMIN" && parsed.data.action === "REVOKE")
+    return fail("نمی‌توانید نقش مدیر ارشد خود را بردارید.");
+  if (parsed.data.action === "GRANT") {
+    // user_roles is the source of truth; the legacy users.role column is not touched.
+    await db
+      .insert(userRoles)
+      .values({ userId: parsed.data.userId, role: parsed.data.role })
+      .onConflictDoNothing();
+  } else {
+    await db
+      .delete(userRoles)
+      .where(and(eq(userRoles.userId, parsed.data.userId), eq(userRoles.role, parsed.data.role)));
+  }
+  await audit(`user:${owner.id}`, `ROLE_${parsed.data.action}`, `user:${parsed.data.userId}:${parsed.data.role}`);
+  revalidatePath("/admin");
+  return ok("دسترسی به‌روزرسانی شد.");
+}
+
+/* ---------- Class sessions (academy blocks instructor availability) ---------- */
+
+const ClassSessionSchema = z.object({
+  classId: z.coerce.number().int().positive(),
+  date: z.string().refine(isValidISODate, "تاریخ نامعتبر است"),
+  startMin: z.coerce.number().int().min(0).max(1439),
+  endMin: z.coerce.number().int().min(1).max(1440),
+});
+
+export async function addClassSessionAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const parsed = ClassSessionSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail("داده نامعتبر است.");
+  if (parsed.data.startMin >= parsed.data.endMin) return fail("بازه زمانی نامعتبر است.");
+  const manager = await requirePermission("academy:manage");
+  if (!manager) return fail("دسترسی غیرمجاز.");
+  await db.insert(classSessions).values(parsed.data);
+  await audit(`user:${manager.id}`, "CLASS_SESSION_ADDED", `class:${parsed.data.classId}:${parsed.data.date}`);
+  revalidatePath("/admin");
+  revalidatePath("/barber");
+  return ok("جلسه ثبت شد و در تقویم مدرس مسدود می‌شود.");
+}
+
+export async function removeClassSessionAction(formData: FormData): Promise<void> {
+  const id = Number(formData.get("sessionId"));
+  if (!Number.isInteger(id)) return;
+  const manager = await requirePermission("academy:manage");
+  if (!manager) return;
+  await db.delete(classSessions).where(eq(classSessions.id, id));
+  revalidatePath("/admin");
 }

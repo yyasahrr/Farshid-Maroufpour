@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
+import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import {
   appointments,
   barberSchedule,
   barberServices,
+  barberSkills,
   barbers,
   blockedTimes,
   notifications,
   services,
+  skills,
 } from "@/db/schema";
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
 import { ActionForm, Field } from "@/components/action-form";
@@ -16,17 +19,18 @@ import { AvailabilityHeatmap } from "@/components/heatmap";
 import { StatCard } from "@/components/ui-cards";
 import { NotificationList } from "@/components/notifications";
 import { heatmap } from "@/lib/availability";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isStaff } from "@/lib/session";
 import {
   applyScheduleTemplateAction,
   blockTimeAction,
   removeBlockAction,
   setBarberDayAction,
+  requestSkillAction,
   toggleBarberServiceAction,
   updateAppointmentStatusAction,
   updateBarberProfileAction,
 } from "@/lib/actions/salon";
-import { WEEKDAY_LABELS, formatPersianDate, formatPrice, minutesToLabel, todayISO } from "@/lib/time";
+import { WEEKDAY_LABELS, formatPersianDate, formatPrice, minutesToLabel, salonMinuteOfDay, todayISO } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +40,7 @@ const SECTIONS = [
   { id: "schedule", label: "برنامه هفتگی" },
   { id: "slots", label: "اسلات‌ها و مرخصی" },
   { id: "profile", label: "پروفایل عمومی" },
+  { id: "skills", label: "مهارت‌ها و تخصص‌ها" },
   { id: "svc", label: "خدمات فعال" },
 ];
 
@@ -48,18 +53,21 @@ const STATUS_FA: Record<string, string> = {
   COMPLETED: "تکمیل",
   NO_SHOW: "غیبت",
   CANCELLED_BY_CLIENT: "لغو مشتری",
+  CANCELLED_EXPIRED: "لغو خودکار (انقضای پرداخت)",
   CANCELLED_BY_STAFF: "لغو سالن",
 };
 
 export default async function BarberDashboard() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "BARBER" || !user.barberId) redirect("/admin");
+  // Any user holding a barber-facing role can enter; staff can too (they also own /admin).
+  if (!user.permissions.has("booking:self") || !user.barberId) redirect(isStaff(user) ? "/admin" : "/login");
 
   const barberId = user.barberId;
   const today = todayISO();
   const [barber] = await db.select().from(barbers).where(eq(barbers.id, barberId)).limit(1);
-  const [todayAppts, week, allServices, myServices, blocks] = await Promise.all([
+  await sweepExpiredPending(db);
+  const [todayAppts, week, allServices, myServices, blocks, mySkillRows, allSkillRows] = await Promise.all([
     db
       .select({
         a: appointments,
@@ -75,12 +83,22 @@ export default async function BarberDashboard() {
       .select()
       .from(blockedTimes)
       .where(and(eq(blockedTimes.barberId, barberId), gte(blockedTimes.date, today))),
+    db
+      .select({
+        skillId: barberSkills.skillId,
+        name: skills.name,
+        status: barberSkills.status,
+      })
+      .from(barberSkills)
+      .innerJoin(skills, eq(skills.id, barberSkills.skillId))
+      .where(eq(barberSkills.barberId, barberId)),
+    db.select().from(skills),
   ]);
 
   const active = todayAppts
     .filter((r) => !r.a.status.startsWith("CANCELLED"))
     .sort((x, y) => x.a.startMin - y.a.startMin);
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const nowMin = salonMinuteOfDay();
   const nextClient = active.find((r) => r.a.startMin >= nowMin) ?? null;
   const firstService = myServices[0]?.serviceId;
   const grid = firstService ? await heatmap(barberId, firstService, 7) : [];
@@ -356,6 +374,42 @@ export default async function BarberDashboard() {
                 defaultValue={barber?.readme ?? ""}
                 className="focus-ring mt-1 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs leading-6"
               />
+            </div>
+          </div>
+        </ActionForm>
+      </Panel>
+
+      <Panel id="skills" title="مهارت‌ها و تخصص‌ها" description="مهارت اعلامی شما تا تأیید مدیریت در زمان‌بندی نوبت‌ها فعال نمی‌شود.">
+        <ul className="mb-4 flex flex-wrap gap-2 text-xs">
+          {mySkillRows.length === 0 && <li className="text-bone/55">هنوز مهارتی ثبت نکرده‌اید.</li>}
+          {mySkillRows.map((row) => (
+            <li
+              key={row.skillId}
+              className={`rounded-full px-3 py-1.5 font-bold ${
+                row.status === "APPROVED"
+                  ? "bg-[#e4ece3] text-[#2f4a3a]"
+                  : row.status === "PENDING"
+                    ? "border border-dashed border-[#8a6a1e] text-[#8a6a1e]"
+                    : "bg-rose-50 text-rose-700"
+              }`}
+            >
+              {row.name}
+              {row.status === "PENDING" && " · در انتظار تأیید"}
+              {row.status === "REJECTED" && " · تأیید نشد"}
+            </li>
+          ))}
+        </ul>
+        <h3 className="text-sm font-bold text-bone">درخواست مهارت جدید</h3>
+        <ActionForm action={requestSkillAction} submitLabel="ثبت درخواست (نیازمند تأیید مدیر)" className="mt-3">
+          <input type="hidden" name="barberId" value={barberId} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="skill-claim" className="text-[11px] font-semibold text-bone/65">مهارت</label>
+              <select id="skill-claim" name="skillId" className="focus-ring mt-1 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs font-semibold">
+                {allSkillRows.map((sk) => (
+                  <option key={sk.id} value={sk.id}>{sk.name}</option>
+                ))}
+              </select>
             </div>
           </div>
         </ActionForm>

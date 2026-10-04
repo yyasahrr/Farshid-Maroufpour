@@ -1,7 +1,7 @@
 import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { bookingPolicyAcceptance, otps, users } from "@/db/schema";
+import { bookingPolicyAcceptance, otps, userRoles, users } from "@/db/schema";
 import { setSessionCookie } from "@/lib/session";
 import { sessionSigningSecret } from "@/lib/server-secret";
 import { demoPhones, isOtpDemoMode } from "@/lib/preview";
@@ -127,9 +127,21 @@ async function getUserOrCreate(phone: string, name?: string) {
 type OtpResult = {
   ok: boolean;
   error?: string;
-  user?: { id: number; name: string; phone: string; role: string };
+  user?: { id: number; name: string; phone: string; role: string; roles: string[] };
   isFirstTime?: boolean;
 };
+
+/** Multi-role payload for the client; permissions themselves never leave the server. */
+async function otpUserPayload(userId: number, row: { id: number; name: string; phone: string; role: string }) {
+  const memberships = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, userId));
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    role: row.role,
+    roles: memberships.length ? memberships.map((m) => m.role) : [row.role],
+  };
+}
 
 /**
  * Validates the OTP. For a returning user it consumes the code and starts the
@@ -150,7 +162,7 @@ export async function verifyOtpCode(phone: string, code: string): Promise<OtpRes
   const consumed = await consumeOtp(check.otpId);
   if (!consumed) return { ok: false, error: "این کد قبلاً استفاده شده است." };
   await setSessionCookie(user.id);
-  return { ok: true, isFirstTime: false, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
+  return { ok: true, isFirstTime: false, user: await otpUserPayload(user.id, user) };
 }
 
 /**
@@ -170,7 +182,43 @@ export async function completeOtpOnboarding(phone: string, code: string, name: s
   const consumed = await consumeOtp(check.otpId);
   if (!consumed) return { ok: false, error: "این کد قبلاً استفاده شده است." };
   await setSessionCookie(user.id);
-  return { ok: true, isFirstTime: false, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
+  return { ok: true, isFirstTime: false, user: await otpUserPayload(user.id, user) };
+}
+
+/**
+ * Guest checkout identity: a customer who reached the pay step with a name and
+ * a phone gets an account WITHOUT an OTP round-trip (the code belongs to the
+ * returning-customer path). Never escalates: staff or non-CLIENT accounts are
+ * not touched, an empty profile left by a half-finished onboarding may be
+ * completed. Returns `existing` when the phone already belongs to a named
+ * account — the UI then routes the person to the OTP login instead.
+ */
+export async function startGuestCheckoutSession(
+  phone: string,
+  name: string,
+): Promise<{ ok: boolean; error?: string; existing?: boolean; user?: { id: number; name: string; phone: string; role: string } }> {
+  const normalized = normalizeIranianMobile(phone);
+  if (!normalized) return { ok: false, error: "شماره موبایل معتبر نیست." };
+  const nameClean = name.trim();
+  if (nameClean.length < 2) return { ok: false, error: "نام کامل را وارد کنید." };
+
+  // Staff/ops numbers are protected by role, not by the demo block (customer
+  // demo numbers must keep working): a non-CLIENT row is never claimed here.
+  const [before] = await db.select().from(users).where(eq(users.phone, normalized)).limit(1);
+  if (before) {
+    if (before.role !== "CLIENT")
+      return { ok: false, error: "این شماره حساب غیرمشتری است؛ با پشتیبانی سالن تماس بگیرید." };
+    // Named account already on this phone? The guest path must NOT log anyone
+    // in without the code — route the visitor to the OTP login instead.
+    if (before.name.trim()) return { ok: true, existing: true };
+  }
+
+  const user = await getUserOrCreate(normalized, nameClean);
+  if (!user) return { ok: false, error: "ساخت حساب کاربری انجام نشد. دوباره تلاش کنید." };
+  if (isDemoPhone(normalized) && user.role !== "CLIENT")
+    return { ok: false, error: "برای حساب کارکنان از بخش ورود کارکنان استفاده کنید." };
+  await setSessionCookie(user.id);
+  return { ok: true, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
 }
 
 export async function hasAcceptedPolicy(userId: number, version = POLICY_CURRENT_VERSION): Promise<boolean> {
