@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { z } from "zod";
 import type { AuthUser } from "@/components/booking/BookingAuthModal";
 import { BookingPolicySheet } from "@/components/booking/BookingPolicySheet";
@@ -143,6 +144,18 @@ function latinDigits(value: string): string {
 type Companion = { id: string; name: string };
 type AttendeeSelection = Record<string, number[]>;
 
+/* Wizard step transitions — spatial (RTL) continuity; durations follow the
+   occasional-interaction tier (enter 240ms ease-out, exit 120ms). Direction is
+   derived from the step delta so forward/back read as left/right, not random. */
+const stepSwap: Variants = {
+  hidden: (dir: number) => ({ opacity: 0, x: 26 * dir }),
+  visible: { opacity: 1, x: 0, transition: { duration: 0.24, ease: [0.23, 1, 0.32, 1] } },
+  // Exit is instant by design: with mode="wait" a non-zero exit delays the next
+  // panel's mount by its duration, which broke polling-based E2E flows (and adds
+  // dead time for the 100x/day keyboard user). The entrance carries the motion.
+  exit: { opacity: 0, transition: { duration: 0 } },
+};
+
 export function CustomerBooking({
   servicesList,
   barbersList,
@@ -175,6 +188,12 @@ export function CustomerBooking({
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(
     initialServiceId ? (initialStartMin !== undefined ? 3 : 1) : 0,
   );
+  const [swapDir, setSwapDir] = useState(-1);
+  const prevStepRef = useRef(step);
+  useEffect(() => {
+    setSwapDir(step >= prevStepRef.current ? -1 : 1);
+    prevStepRef.current = step;
+  }, [step]);
   const [selected, setSelected] = useState<AttendeeSelection>(() =>
     initialServiceId ? { primary: [initialServiceId] } : { primary: [] },
   );
@@ -861,7 +880,7 @@ export function CustomerBooking({
     return (
       <div className="mx-auto max-w-xl px-4 py-8">
         <div className="ui-panel text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[18px] bg-[var(--color-accent-soft)] text-3xl font-black text-[var(--color-action-primary)]">✓</div>
+          <motion.div initial={{ opacity: 0, scale: 0.82 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 340, damping: 22 }} className="mx-auto flex h-16 w-16 items-center justify-center rounded-[18px] bg-[var(--color-accent-soft)] text-3xl font-black text-[var(--color-action-primary)]">✓</motion.div>
           <h1 className="mt-5 text-2xl font-black">رزرو شما ثبت شد</h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
             {formatPersianDate(visit.date)} · {minutesToLabel(visit.startMin)} تا {minutesToLabel(visit.endMin)}
@@ -962,9 +981,10 @@ export function CustomerBooking({
         </button>
       </header>
 
+      <AnimatePresence mode="wait" initial={false} custom={swapDir}>
       {/* ============ STEP 0 — services ============ */}
       {step === 0 && (
-        <section aria-labelledby="services-title">
+        <motion.section key="step-0" variants={stepSwap} initial="hidden" animate="visible" exit="exit" aria-labelledby="services-title">
           <div className="ui-pagehead">
             <h1 id="services-title">چه خدمتی می‌خواهید؟</h1>
             <p>روی کلید هر خدمت بزنید؛ می‌توانید چند خدمت را با هم انتخاب کنید.</p>
@@ -981,7 +1001,7 @@ export function CustomerBooking({
                 <span key={companion.id} className="inline-flex items-center gap-1">
                   <button type="button" onClick={() => setActiveAttendee(companion.id)} aria-pressed={activeAttendee === companion.id} className={`focus-ring ui-pill min-h-11 !px-4 text-sm font-bold ${activeAttendee === companion.id ? "bg-[var(--color-action-primary)] text-white" : "border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"}`}>
                     {companion.name}
-                    {count > 0 && <span className="me-1.5 rounded-full bg-[var(--color-accent-soft)] px-1.5 text-xs text-[var(--color-action-primary)]">{persianNum(count)}</span>}
+                    {count > 0 && <motion.span key={count} initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 26 }} className="me-1.5 inline-block rounded-full bg-[var(--color-accent-soft)] px-1.5 text-xs text-[var(--color-action-primary)]">{persianNum(count)}</motion.span>}
                   </button>
                   <button type="button" aria-label={`حذف ${companion.name}`} onClick={() => { setCompanions((c) => c.filter((x) => x.id !== companion.id)); if (activeAttendee === companion.id) setActiveAttendee("primary"); }} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-danger)]">
                     <Icon name="close" className="h-3.5 w-3.5" />
@@ -1090,12 +1110,12 @@ export function CustomerBooking({
               </button>
             </div>
           )}
-        </section>
+        </motion.section>
       )}
 
       {/* ============ STEP 1 — barber (BEFORE the time, so the grid shows what they actually offer) ============ */}
       {step === 1 && (
-        <section aria-labelledby="barber-title">
+        <motion.section key="step-1" variants={stepSwap} initial="hidden" animate="visible" exit="exit" aria-labelledby="barber-title">
           <div className="ui-pagehead">
             <h1 id="barber-title">با چه آرایشگری؟</h1>
             <p>
@@ -1184,12 +1204,12 @@ export function CustomerBooking({
             </div>
             <button type="button" onClick={() => setStep(2)} className="ui-button shrink-0 !min-h-11 !px-6">انتخاب زمان</button>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* ============ STEP 2 — date & single start time ============ */}
       {step === 2 && (
-        <section aria-labelledby="time-title">
+        <motion.section key="step-2" variants={stepSwap} initial="hidden" animate="visible" exit="exit" aria-labelledby="time-title">
           <div className="ui-pagehead">
             <h1 id="time-title">کِی میایید؟</h1>
             <p>
@@ -1251,12 +1271,12 @@ export function CustomerBooking({
               />
             )}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* ============ STEP 3 — review, identity & commit ============ */}
       {step === 3 && (
-        <section aria-labelledby="summary-title">
+        <motion.section key="step-3" variants={stepSwap} initial="hidden" animate="visible" exit="exit" aria-labelledby="summary-title">
           <div className="ui-pagehead">
             <h1 id="summary-title">بازبینی و ثبت</h1>
             <p>آخرین نگاه؛ مجموع هزینه پایین همین صفحه است. ورود یا ساخت حساب هم فقط همین‌جا پرسیده می‌شود.</p>
@@ -1494,8 +1514,9 @@ export function CustomerBooking({
                       : "تأیید و ثبت نوبت"}
             </button>
           </div>
-        </section>
+        </motion.section>
       )}
+      </AnimatePresence>
     </div>
   );
 }

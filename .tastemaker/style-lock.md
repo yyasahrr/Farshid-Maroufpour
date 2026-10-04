@@ -58,3 +58,12 @@ radius control ۱۲، input ۱۶، list card ۲۰، panel ۲۴، hero bento ۲۸
 - طلا به‌عنوان متن روی زمینهٔ روشن ممنوع (#c59b4b روی سفید = Lc 50): همهٔ text-[#c59b4b] → text-brass-700 (77).
 - فاصله‌ها فقط logical (ms/me/ps/pe/start/end)؛ تنها استثنا: جزیرهٔ dir=ltr پیش‌شمارهٔ تلفن در BookingAuthModal.
 - inputهای موبایل: کف ۱۶px با media query (ضد زوم iOS). h1/h2/h3: text-wrap: balance؛ پاراگراف‌ها: pretty. لینک «پرش به محتوا» + :focus-visible حلقهٔ ۲px.
+
+## حرکت v1 (framer-motion + CSS dialog choreography)
+- خط مشی سراسری: `MotionProvider` = `MotionConfig reducedMotion="user"` روی بدنه layout. هیچ کامپوننتی جداگانه چک نمی‌کند.
+- تقسیم کار: GSAP/Lenis موجود فقط scroll-reveal برندها؛ framer فقط لایه تعامل (stapها، popها)؛ دیالوگ‌ها با CSS `@starting-style` + `allow-discrete` (ناتیتیو dialog و focus-trap دست‌نخورده).
+- فرکانس (emil framework): پنل‌های ویزارد ورودی ۲۴۰ms ease-out [0.23,1,0.32,1] با جهت RTL از روی delta مرحله؛ **خروج صفرمدت** — `mode="wait"` با exit غیرصفر پنل بعدی را عقب می‌انداخت و E2Eهای polling را می‌شکست (واقعی: qa-admin-pay).
+- بازخورد حالت: pop شمارنده مهمان (spring 500/26، با key روی count)، pop ✓ رسید (spring، صحنه کم‌فرکانس → مجاز به ذوق‌زدن).
+- bottom-nav موبایل و دکمه‌ها: همان `motion-safe:active:scale` موجود؛ چیز جدید اضافه نشد (بالای ۱۰۰بار/روز = بدون انیمیشن اضافه).
+- الگوهای 21st.dev که اعمال شد: step-wizard با جهت‌دار بودن، dialog scale-ورودی (دسکتوب) / sheet-y (موبایل)، indicator layoutId برای تب‌ها (در نظر بود و به‌خاطر نبود تب با پس‌زمینه مشترک رد شد — ناوبری موجود CSS-انیمیت دارد).
+- ممنوع: شروع از scale 0؛ انیمیشن width/height؛ یک duration برای همه‌جا؛ حرکت بدون دلیل (stats count-up به‌خاطر نبود بخش آمار رد شد).

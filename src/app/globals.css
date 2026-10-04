@@ -770,6 +770,52 @@ img.no-outline {
   backdrop-filter: blur(3px);
 }
 
+/* Dialog choreography (entrance + exit via allow-discrete). Kept in CSS — the
+   dialogs stay native <dialog> so focus trap / Esc / inert semantics from the
+   modal-logic JS remain untouched. */
+@media (prefers-reduced-motion: no-preference) {
+  .auth-dialog,
+  .policy-dialog {
+    opacity: 0;
+    transform: scale(0.965);
+    transition:
+      opacity 0.2s ease-out,
+      transform 0.2s ease-out,
+      overlay 0.2s ease-out allow-discrete,
+      display 0.2s ease-out allow-discrete;
+  }
+  .auth-dialog[open],
+  .policy-dialog[open] {
+    opacity: 1;
+    transform: none;
+  }
+  @starting-style {
+    .auth-dialog[open],
+    .policy-dialog[open] {
+      opacity: 0;
+      transform: scale(0.965);
+    }
+  }
+  .auth-dialog::backdrop,
+  .policy-dialog::backdrop {
+    opacity: 0;
+    transition:
+      opacity 0.24s ease-out,
+      overlay 0.24s ease-out allow-discrete,
+      display 0.24s ease-out allow-discrete;
+  }
+  .auth-dialog[open]::backdrop,
+  .policy-dialog[open]::backdrop {
+    opacity: 1;
+  }
+  @starting-style {
+    .auth-dialog[open]::backdrop,
+    .policy-dialog[open]::backdrop {
+      opacity: 0;
+    }
+  }
+}
+
 @media (max-width: 639px) {
   .policy-dialog,
   .auth-dialog {
@@ -778,6 +824,22 @@ img.no-outline {
     max-width: 100%;
     border-radius: 24px 24px 0 0;
     padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .auth-dialog[open],
+    .policy-dialog[open] {
+      transform: none;
+    }
+    .auth-dialog:not([open]),
+    .policy-dialog:not([open]) {
+      transform: translateY(24px);
+    }
+    @starting-style {
+      .auth-dialog[open],
+      .policy-dialog[open] {
+        transform: translateY(24px);
+      }
+    }
   }
 }
 

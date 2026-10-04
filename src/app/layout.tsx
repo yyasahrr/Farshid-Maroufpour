@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SITE_NAME, SITE_NAME_EN, absoluteUrl } from "@/lib/site";
 import "./globals.css";
+import { MotionProvider } from "@/components/motion-config";
 
 export const metadata: Metadata = {
   metadataBase: new URL(absoluteUrl("/")),
@@ -46,7 +47,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="min-h-screen antialiased">
         <a href="#main" className="skip-link">پرش به محتوای اصلی</a>
-        {children}
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );
