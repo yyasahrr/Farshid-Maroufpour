@@ -875,12 +875,12 @@ export function CustomerBooking({
               این نوبت نیازمند تأیید مدیر است؛ پس از بررسی، وضعیت آن از پنل نوبت‌ها قابل مشاهده است.
             </p>
           )}
-          <ol className="mt-6 space-y-2 text-right">
+          <ol className="mt-6 space-y-2 text-start">
             {visit.segments.map((segment, index) => (
               <li key={`${segment.serviceId}-${index}`} className="rounded-[14px] bg-[var(--color-surface-sunken)] p-3 text-sm">
                 <p className="font-bold">
                   {segment.serviceName}
-                  <span className="mr-2 font-mono text-xs font-normal text-[var(--color-text-muted)]">
+                  <span className="me-2 font-mono text-xs font-normal text-[var(--color-text-muted)]">
                     {minutesToLabel(segment.startMin)}–{minutesToLabel(segment.clientEndMin)}
                   </span>
                 </p>
@@ -894,7 +894,7 @@ export function CustomerBooking({
           </ol>
           <p className="mt-4 text-sm">
             {receipt.amountDueOnline > 0 && <span className="font-bold text-[var(--color-action-primary)]">پرداخت آنلاین: {formatPrice(receipt.amountDueOnline)}</span>}
-            {receipt.remainingDue > 0 && <span className={receipt.amountDueOnline > 0 ? "mr-3 text-[var(--color-text-muted)]" : ""}>مانده در سالن: {formatPrice(receipt.remainingDue)}</span>}
+            {receipt.remainingDue > 0 && <span className={receipt.amountDueOnline > 0 ? "me-3 text-[var(--color-text-muted)]" : ""}>مانده در سالن: {formatPrice(receipt.remainingDue)}</span>}
           </p>
           <p className="mt-3 text-xs text-[var(--color-text-muted)]">حساب کاربری تو با همین شمارهٔ موبایل ساخته/به‌روزرسانی شد؛ از «نوبت‌های من» پیگیری کن.</p>
           <Link href="/account" className="ui-button mt-6 w-full">مشاهده نوبت من</Link>
@@ -981,7 +981,7 @@ export function CustomerBooking({
                 <span key={companion.id} className="inline-flex items-center gap-1">
                   <button type="button" onClick={() => setActiveAttendee(companion.id)} aria-pressed={activeAttendee === companion.id} className={`focus-ring ui-pill min-h-11 !px-4 text-sm font-bold ${activeAttendee === companion.id ? "bg-[var(--color-action-primary)] text-white" : "border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"}`}>
                     {companion.name}
-                    {count > 0 && <span className="mr-1.5 rounded-full bg-[var(--color-accent-soft)] px-1.5 text-xs text-[var(--color-action-primary)]">{persianNum(count)}</span>}
+                    {count > 0 && <span className="me-1.5 rounded-full bg-[var(--color-accent-soft)] px-1.5 text-xs text-[var(--color-action-primary)]">{persianNum(count)}</span>}
                   </button>
                   <button type="button" aria-label={`حذف ${companion.name}`} onClick={() => { setCompanions((c) => c.filter((x) => x.id !== companion.id)); if (activeAttendee === companion.id) setActiveAttendee("primary"); }} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-danger)]">
                     <Icon name="close" className="h-3.5 w-3.5" />
@@ -1010,8 +1010,8 @@ export function CustomerBooking({
 
           <div className="relative">
             <label htmlFor="service-search" className="sr-only">جست‌وجوی خدمت</label>
-            <Icon name="search" className="pointer-events-none absolute right-4 top-3.5 h-5 w-5 text-[var(--color-text-muted)]" />
-            <input id="service-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="مثلاً فید یا طراحی ریش" className="ui-input pr-11" />
+            <Icon name="search" className="pointer-events-none absolute start-4 top-3.5 h-5 w-5 text-[var(--color-text-muted)]" />
+            <input id="service-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="مثلاً فید یا طراحی ریش" className="ui-input ps-11" />
           </div>
           {categories.length > 2 && (
             <div role="group" aria-label="دسته‌بندی خدمات" className="hide-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -1129,7 +1129,7 @@ export function CustomerBooking({
                         data-barber-card="any"
                         onClick={() => setGroupPins((previous) => ({ ...previous, [group.key]: null }))}
                         aria-pressed={auto}
-                        className={`bk-row w-full text-right ${auto ? "bk-row-on" : ""}`}
+                        className={`bk-row w-full text-start ${auto ? "bk-row-on" : ""}`}
                       >
                         <div className="min-w-0 flex-1">
                           <strong className="block text-[15px] font-bold">خودکار — سالن بچیند</strong>
@@ -1155,7 +1155,7 @@ export function CustomerBooking({
                             }
                             aria-pressed={isOn}
                             disabled={!eligible}
-                            className={`bk-row w-full text-right ${isOn ? "bk-row-on" : ""} ${!eligible ? "bk-row-disabled" : ""}`}
+                            className={`bk-row w-full text-start ${isOn ? "bk-row-on" : ""} ${!eligible ? "bk-row-disabled" : ""}`}
                           >
                             <div className="min-w-0 flex-1">
                               <strong className="block text-[15px] font-bold">{barber.name}</strong>
@@ -1326,7 +1326,7 @@ export function CustomerBooking({
                 <div className="mt-4 space-y-3">
                   <p className="text-sm leading-6">
                     کد ۶ رقمی برای <strong dir="ltr">{localMobile(loginPhone)}</strong> پیامک شد.
-                    {previewCode && <button type="button" onClick={() => { const fill = previewCode.slice(0, 6).split(""); setOtpCode(fill.concat(Array(6 - fill.length).fill("")).slice(0, 6)); if (fill.length === 6) void verifyOtp(fill.join("")); }} className="focus-ring mr-2 rounded-pill bg-[var(--color-accent-soft)] px-2 text-xs font-bold text-[var(--color-action-primary)]">کد دمو: {previewCode}</button>}
+                    {previewCode && <button type="button" onClick={() => { const fill = previewCode.slice(0, 6).split(""); setOtpCode(fill.concat(Array(6 - fill.length).fill("")).slice(0, 6)); if (fill.length === 6) void verifyOtp(fill.join("")); }} className="focus-ring me-2 rounded-pill bg-[var(--color-accent-soft)] px-2 text-xs font-bold text-[var(--color-action-primary)]">کد دمو: {previewCode}</button>}
                   </p>
                   <div dir="ltr" role="group" aria-label="شش رقم کد تأیید" className="flex justify-center gap-2">
                     {otpCode.map((digit, index) => (
@@ -1427,7 +1427,7 @@ export function CustomerBooking({
               <p className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-base font-black">
                   {formatPersianDate(reviewPlan.date)} · {minutesToLabel(reviewPlan.startMin)}–{minutesToLabel(reviewPlan.endMin)}
-                  <span className="mr-2 rounded-pill bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-action-primary)]">یک نوبت · {persianNum(reviewPlan.totalMinutes)} دقیقه</span>
+                  <span className="me-2 rounded-pill bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-action-primary)]">یک نوبت · {persianNum(reviewPlan.totalMinutes)} دقیقه</span>
                 </span>
                 <button type="button" onClick={() => setStep(2)} className="focus-ring text-xs font-bold text-[var(--color-action-primary)] underline">ویرایش</button>
               </p>
@@ -1436,7 +1436,7 @@ export function CustomerBooking({
                   <li key={`${segment.serviceId}-${index}`} className="bk-seg">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-bold">{segment.serviceName}
-                        {segment.attendeeId !== "primary" && <span className="mr-2 text-xs font-normal text-[var(--color-text-muted)]">برای {companions.find((c) => c.id === segment.attendeeId)?.name ?? "همراه"}</span>}
+                        {segment.attendeeId !== "primary" && <span className="me-2 text-xs font-normal text-[var(--color-text-muted)]">برای {companions.find((c) => c.id === segment.attendeeId)?.name ?? "همراه"}</span>}
                       </p>
                       <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                         <Link data-segment-barber={segment.barberSlug} href={`/barbers/${segment.barberSlug}`} className="font-semibold underline-offset-2 hover:underline">{segment.barberName}</Link>

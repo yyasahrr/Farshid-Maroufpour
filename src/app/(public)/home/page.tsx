@@ -44,7 +44,7 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div className="min-h-screen bg-[#f6f5f1]">
+    <div className="min-h-screen bg-bone-100">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{

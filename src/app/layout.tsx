@@ -44,7 +44,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           crossOrigin="anonymous"
         />
       </head>
-      <body className="min-h-screen antialiased">{children}</body>
+      <body className="min-h-screen antialiased">
+        <a href="#main" className="skip-link">پرش به محتوای اصلی</a>
+        {children}
+      </body>
     </html>
   );
 }

@@ -23,14 +23,14 @@ export function ActionForm({
         <button
           type="submit"
           disabled={pending}
-          className="focus-ring rounded-full bg-[#0f5a3b] px-5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#094028] disabled:bg-bone/15 disabled:text-bone/40"
+          className="focus-ring rounded-full bg-brand-700 px-5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-[#094028] disabled:bg-bone/15 disabled:text-bone/40"
         >
           {pending ? "در حال ثبت…" : submitLabel}
         </button>
         {state && (
           <p
             role="status"
-            className={`text-xs font-bold ${state.ok ? "text-[#0f5a3b]" : "text-rose-700"}`}
+            className={`text-xs font-bold ${state.ok ? "text-brand-700" : "text-rose-700"}`}
           >
             {state.message}
           </p>
@@ -68,7 +68,7 @@ export function Field({
         dir={dir}
         required={required}
         defaultValue={defaultValue}
-        className="focus-ring mt-1 w-full rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs font-medium"
+        className="focus-ring mt-1 w-full rounded-xl border border-brass-400/30 bg-white px-3 py-2 text-xs font-medium"
       />
     </div>
   );

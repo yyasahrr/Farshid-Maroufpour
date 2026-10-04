@@ -83,18 +83,18 @@ export function CoursePlayer({
   return (
     <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]" data-course-player={courseSlug}>
       <aside className="ui-panel lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto !p-0">
-        <div className="border-b border-[#e2e5df] p-4">
-          <p className="text-xs font-bold text-[#5f7168]">
+        <div className="border-b border-bone-150 p-4">
+          <p className="text-xs font-bold text-bone-500">
             پیشرفت شما — {doneCount.toLocaleString("fa-IR")} از {flat.length.toLocaleString("fa-IR")} درس
           </p>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#eef0ea]" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-full rounded-full bg-[#2f4a3a] transition-[width] duration-300" style={{ width: `${progress}%` }} />
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-bone-200" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-full rounded-full bg-brand-400 transition-[width] duration-300" style={{ width: `${progress}%` }} />
           </div>
         </div>
         <nav aria-label="درس‌ها" className="p-2">
           {groups.map((group) => (
             <div key={group.title} className="mb-2">
-              <p className="px-2 pb-1 pt-3 text-[11px] font-black uppercase tracking-wide text-[#8a6a1e]">{group.title}</p>
+              <p className="px-2 pb-1 pt-3 text-[11px] font-black uppercase tracking-wide text-brass-800">{group.title}</p>
               <ol className="space-y-1">
                 {group.lessons.map((lesson) => {
                   const isDone = completed.has(lesson.id);
@@ -106,13 +106,13 @@ export function CoursePlayer({
                         onClick={() => setActiveId(lesson.id)}
                         aria-current={isActive ? "true" : undefined}
                         data-lesson={lesson.id}
-                        className={`focus-ring flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-right text-sm transition-colors ${isActive ? "bg-[#e3f0e9] font-black text-[#1f2e27]" : "hover:bg-[#f6f5f1] text-[#3c4743]"}`}
+                        className={`focus-ring flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-right text-sm transition-colors ${isActive ? "bg-brand-50 font-black text-bone-700" : "hover:bg-bone-100 text-[#3c4743]"}`}
                       >
-                        <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${isDone ? "border-[#2f4a3a] bg-[#2f4a3a] text-white" : "border-[#c9cfc8] text-transparent"}`}>
+                        <span aria-hidden="true" className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px] ${isDone ? "border-brand-400 bg-brand-400 text-white" : "border-[#c9cfc8] text-transparent"}`}>
                           <Icon name="check" className="h-3 w-3" />
                         </span>
                         <span className="min-w-0 flex-1 truncate">{lesson.title}</span>
-                        <span className="shrink-0 text-[11px] text-[#5f7168]">{minutesLabel(lesson.durationMin)}</span>
+                        <span className="shrink-0 text-[11px] text-bone-500">{minutesLabel(lesson.durationMin)}</span>
                       </button>
                     </li>
                   );
@@ -125,7 +125,7 @@ export function CoursePlayer({
 
       <section aria-label="پخش درس" className="min-w-0">
         {!active ? (
-          <div className="ui-panel text-sm leading-8 text-[#5f7168]">این دوره هنوز درسی ندارد.</div>
+          <div className="ui-panel text-sm leading-8 text-bone-500">این دوره هنوز درسی ندارد.</div>
         ) : (
           <article className="ui-panel overflow-hidden !p-0">
             <div className="aspect-video bg-black">
@@ -140,7 +140,7 @@ export function CoursePlayer({
             </div>
             <div className="p-5">
               <h2 className="text-lg font-black">{active.title}</h2>
-              {active.notes && <p className="mt-2 whitespace-pre-line text-sm leading-8 text-[#5f7168]">{active.notes}</p>}
+              {active.notes && <p className="mt-2 whitespace-pre-line text-sm leading-8 text-bone-500">{active.notes}</p>}
               {error && (
                 <p role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">
                   {error}
@@ -154,7 +154,7 @@ export function CoursePlayer({
                   type="button"
                   onClick={() => void toggleCompleted(active.id, !completed.has(active.id))}
                   disabled={busy}
-                  className={`ui-button !min-h-11 !px-5 !text-xs ${completed.has(active.id) ? "" : "!bg-[#2f4a3a]"}`}
+                  className={`ui-button !min-h-11 !px-5 !text-xs ${completed.has(active.id) ? "" : "!bg-brand-400"}`}
                 >
                   {completed.has(active.id) ? "لغو تکمیل درس" : "این درس را دیدم"}
                 </button>

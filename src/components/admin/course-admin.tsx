@@ -62,13 +62,13 @@ export async function CourseAdminPanel() {
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-xl px-1 py-1 hover:bg-white">
                 <span className="font-bold text-bone">
                   {course.title}
-                  <span className={`mr-2 rounded-full px-2 py-0.5 text-[10px] font-black ${course.status === "PUBLISHED" ? "bg-[#e3f0e9] text-[#0f5a3b]" : course.status === "DRAFT" ? "bg-[#f7f0d8] text-[#6b5213]" : "bg-bone/10 text-bone/50"}`}>
+                  <span className={`me-2 rounded-full px-2 py-0.5 text-[10px] font-black ${course.status === "PUBLISHED" ? "bg-[#e3f0e9] text-[#0f5a3b]" : course.status === "DRAFT" ? "bg-[#f7f0d8] text-[#6b5213]" : "bg-bone/10 text-bone/50"}`}>
                     {STATUS_FA[course.status] ?? course.status}
                   </span>
                 </span>
                 <span className="text-[11px] text-bone/60">
                   {sectionCount.toLocaleString("fa-IR")} سرفصل · {lessonCount.toLocaleString("fa-IR")} درس · {enrollCount.toLocaleString("fa-IR")} ثبت‌نام
-                  {pendingReviews > 0 && <b className="mr-2 text-[#855e16]">{pendingReviews.toLocaleString("fa-IR")} نظر در انتظار تأیید</b>}
+                  {pendingReviews > 0 && <b className="me-2 text-[#855e16]">{pendingReviews.toLocaleString("fa-IR")} نظر در انتظار تأیید</b>}
                 </span>
               </summary>
 
@@ -155,8 +155,8 @@ export async function CourseAdminPanel() {
                         <li key={l.id} className="flex items-center justify-between gap-2 rounded-lg bg-white p-2">
                           <span className="min-w-0 truncate font-semibold text-bone">
                             {l.position.toLocaleString("fa-IR")}. {l.title}
-                            {l.freePreview && <b className="mr-1.5 text-[10px] text-[#855e16]">نمونه رایگان</b>}
-                            {l.videoUrl === null && <b className="mr-1.5 text-[10px] text-rose-600">بدون ویدیو</b>}
+                            {l.freePreview && <b className="me-1.5 text-[10px] text-[#855e16]">نمونه رایگان</b>}
+                            {l.videoUrl === null && <b className="me-1.5 text-[10px] text-rose-600">بدون ویدیو</b>}
                           </span>
                           <span className="flex shrink-0 items-center gap-2 text-bone/55">
                             {l.durationMin > 0 && <span className="tabular-nums">{l.durationMin} دقیقه</span>}

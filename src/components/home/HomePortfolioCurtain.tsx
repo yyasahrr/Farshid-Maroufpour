@@ -34,7 +34,7 @@ export function HomePortfolioCurtain({ items }: { items: GalleryItem[] }) {
               if (event.pointerType === "mouse") setActiveId(item.id);
             }}
             onFocus={() => setActiveId(item.id)}
-            className="home-portfolio-panel focus-ring relative min-h-[360px] min-w-0 overflow-hidden rounded-[22px] bg-[#10261b] text-right text-white sm:min-h-[420px]"
+            className="home-portfolio-panel focus-ring relative min-h-[360px] min-w-0 overflow-hidden rounded-[22px] bg-brand-900 text-right text-white sm:min-h-[420px]"
             data-active={isActive}
           >
             <Image

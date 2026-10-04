@@ -25,6 +25,7 @@
   /* neutral ramp */
   --color-bone-50: #fdfcf9;
   --color-bone-100: #f6f5f1;
+  --color-bone-150: #e2e5df;
   --color-bone-200: #edece8;
   --color-bone-300: #e5e0d4;
   --color-bone-500: #59636b;
@@ -40,10 +41,14 @@
   --color-brand-600: #14432f;
   --color-brand-700: #0f5a3b;
   --color-brand-800: #0b4a30;
+  --color-brand-900: #10261b;
+  --color-brand-950: #07170f;
 
   /* brass ramp — second accent, earns its place on price and shop surfaces */
   --color-brass-50: #f7f0d8;
   --color-brass-200: #eadfb8;
+  --color-brass-400: #c59b4b;
+  --color-brass-600: #855e16;
   --color-brass-700: #6b5213;
   --color-brass-800: #8a6a1e;
 
@@ -176,6 +181,44 @@ button:disabled {
   outline: 2px solid var(--color-action-primary);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* a11y: skip link — hidden until focused (top end flips with dir automatically) */
+.skip-link {
+  visibility: hidden;
+  position: fixed;
+  top: 10px;
+  inset-inline-start: 10px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--color-brand-700);
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-200%);
+  transition: transform 150ms ease-out;
+}
+.skip-link:focus-visible {
+  visibility: visible;
+  transform: none;
+}
+
+/* iOS/Safari zoom-on-focus guard: small text inputs get a 16px floor on phones */
+@media (max-width: 767px) {
+  :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), textarea, select):is([class*="text-xs"], [class*="text-sm"], [class*="text-["]) {
+    font-size: 16px;
+  }
+}
+
+/* Typography: balanced heads, pretty prose (graceful no-op on old engines) */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+.ui-shell p,
+main p {
+  text-wrap: pretty;
 }
 
 /* ---------- shell ---------- */
@@ -914,9 +957,9 @@ img.no-outline {
 }
 .bk-tl-hold {
   background: transparent;
-  border-color: var(--color-action-primary);
+  border-color: var(--color-action-primary); /* stroke keeps the fill jade */
   border-style: dashed;
-  color: var(--color-action-primary);
+  color: var(--color-action-text); /* text role: 11px jade was Lc -43, now -76 */
 }
 .bk-tl-class {
   background: var(--color-class-soft);
@@ -960,8 +1003,9 @@ img.no-outline {
   --color-surface-sunken: #121413;
   --color-text-primary: #f1f0ea;
   --color-text-secondary: #c4cac4;
-  --color-text-muted: #8a938b;
+  --color-text-muted: #b3bcb3; /* APCA -64 on surface; #8a938b was -42, below the 60 floor for 11px meta */
   --color-action-primary: #2fa37b;
+  --color-action-text: #8fdcbc; /* jade for TEXT on dark (Lc -76); fills keep action-primary */
   --color-action-primary-hover: #3ab88c;
   --color-action-ink: #08120d;
   --color-accent-soft: rgba(47, 163, 123, 0.16);
@@ -973,7 +1017,7 @@ img.no-outline {
   --color-warning: #e6c98a;
   --color-warning-soft: rgba(217, 179, 100, 0.12);
   --color-warning-line: rgba(230, 201, 138, 0.3);
-  --color-danger: #e09aa3;
+  --color-danger: #e9a9b2; /* was #e09aa3 (Lc -57 < 60 floor) */
   --color-danger-soft: rgba(191, 84, 99, 0.14);
   color: var(--color-text-primary);
   background: var(--color-bg);
@@ -1027,7 +1071,7 @@ img.no-outline {
   color: var(--color-text-primary);
 }
 .theme-ops [class~="text-[#0f5a3b]"] {
-  color: #58c79b !important;
+  color: var(--color-action-text) !important;
 }
 .theme-ops [class~="text-[#855e16]"],
 .theme-ops [class~="text-[#8a6a1e]"] {
@@ -1058,7 +1102,7 @@ img.no-outline {
 .theme-ops [class~="bg-[#e4ece3]"],
 .theme-ops [class~="bg-[#e2efe8]"] {
   background: var(--color-accent-soft) !important;
-  color: #7ed0ae !important;
+  color: var(--color-action-text) !important;
 }
 .theme-ops [class~="bg-[#f7f0d8]"] {
   background: var(--color-warning-soft) !important;
@@ -1172,7 +1216,7 @@ img.no-outline {
   border: 1px solid transparent;
 }
 .ops-chip-ok {
-  color: #7ed0ae;
+  color: var(--color-action-text);
   background: rgba(47, 163, 123, 0.14);
   border-color: var(--color-accent-line);
 }
@@ -1286,7 +1330,7 @@ img.no-outline {
   color: var(--color-text-secondary);
 }
 .ops-link {
-  color: #58c79b;
+  color: var(--color-action-text);
   font-weight: 700;
   text-underline-offset: 3px;
 }

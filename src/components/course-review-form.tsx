@@ -43,7 +43,7 @@ export function CourseReviewForm({ courseId, initialRating, initialComment }: { 
               aria-checked={rating === value}
               aria-label={`${value} ستاره`}
               onClick={() => setRating(value)}
-              className={`focus-ring min-h-11 min-w-11 rounded-lg text-xl ${value <= rating ? "text-[#c59b4b]" : "text-[#c9cfc8]"}`}
+              className={`focus-ring min-h-11 min-w-11 rounded-lg text-xl ${value <= rating ? "text-brass-700" : "text-[#c9cfc8]"}`}
             >
               ★
             </button>
@@ -63,7 +63,7 @@ export function CourseReviewForm({ courseId, initialRating, initialComment }: { 
         className="ui-input mt-1 w-full resize-y rounded-xl border border-[#d9ded6] bg-white p-3 text-sm"
       />
       {message && (
-        <p role={message.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-lg p-3 text-sm ${message.kind === "ok" ? "bg-[#e3f0e9] text-[#2f4a3a]" : "bg-rose-50 text-rose-700"}`}>
+        <p role={message.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-lg p-3 text-sm ${message.kind === "ok" ? "bg-brand-50 text-brand-400" : "bg-rose-50 text-rose-700"}`}>
           {message.text}
         </p>
       )}

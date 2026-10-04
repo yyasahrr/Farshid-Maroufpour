@@ -31,21 +31,21 @@ export default async function CourseLearnPage({
   const done = data.completedIds.length;
 
   return <div className="ui-shell"><div className="ui-container ui-page max-w-[1200px]">
-    <nav aria-label="مسیر" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-[#5f7168]">
+    <nav aria-label="مسیر" className="mb-5 flex flex-wrap items-center gap-2 text-sm text-bone-500">
       <Link className="ui-link" href="/account">حساب من</Link><span>/</span>
       <Link className="ui-link" href={`/courses/${course.slug}`}>{course.title}</Link><span>/</span>درس‌ها
     </nav>
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-2xl font-black">{course.title}</h1>
-        <p className="mt-1 text-sm text-[#5f7168]">
+        <p className="mt-1 text-sm text-bone-500">
           {done.toLocaleString("fa-IR")} از {total.toLocaleString("fa-IR")} درس دیده‌شده
           {enrollment.status === "COMPLETED" ? " — دوره را کامل کرده‌اید" : ""}
         </p>
       </div>
       {enrollment.grade !== null && (
         <div className="ui-card px-4 py-2 text-sm">
-          <span className="text-xs text-[#5f7168]">نتیجه دوره شما</span>
+          <span className="text-xs text-bone-500">نتیجه دوره شما</span>
           <p className="mt-0.5 font-black tabular-nums">{(enrollment.grade / 5).toLocaleString("fa-IR", { maximumFractionDigits: 2 })} از ۲۰</p>
         </div>
       )}
@@ -70,17 +70,17 @@ export default async function CourseLearnPage({
     />
 
     {enrollment.resultNote && (
-      <aside className="mt-8 rounded-2xl bg-[#e3f0e9] p-5 text-sm leading-8 text-[#2f4a3a]">
+      <aside className="mt-8 rounded-2xl bg-brand-50 p-5 text-sm leading-8 text-brand-400">
         <span className="ui-pill ui-tag-academy"><Icon name="cap" className="h-4 w-4" />بازخورد مدرس</span>
         <p className="mt-2 whitespace-pre-line">{enrollment.resultNote}</p>
-        <p className="mt-1 text-[11px] text-[#5f7168]">ثبت‌شده در {formatPersianDate(enrollment.updatedAt.toISOString().slice(0, 10))}</p>
+        <p className="mt-1 text-[11px] text-bone-500">ثبت‌شده در {formatPersianDate(enrollment.updatedAt.toISOString().slice(0, 10))}</p>
       </aside>
     )}
 
     {enrollment.status === "COMPLETED" && (
       <section className="mt-8 max-w-xl" aria-label="ثبت نظر">
         <h2 className="text-lg font-black">تجربه شما برای بقیه</h2>
-        <p className="mb-3 mt-1 text-sm leading-7 text-[#5f7168]">دوره تمام شده؛ نظرتان پس از تأیید کادر آکادمی در صفحه دوره نمایش داده می‌شود.</p>
+        <p className="mb-3 mt-1 text-sm leading-7 text-bone-500">دوره تمام شده؛ نظرتان پس از تأیید کادر آکادمی در صفحه دوره نمایش داده می‌شود.</p>
         <CourseReviewForm courseId={course.id} initialRating={0} initialComment="" />
       </section>
     )}

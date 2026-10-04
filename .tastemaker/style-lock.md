@@ -49,3 +49,12 @@ radius control ۱۲، input ۱۶، list card ۲۰، panel ۲۴، hero bento ۲۸
 
 ## No drift
 رنگ سبز جنگلی CTA، متن خرد طلایی، کارت‌های glass در تمام صفحات، گرادینت‌های تصادفی، ادعاهای «گواهی رسمی/ارسال پیامک/درگاه شتاب» بدون پیکربندی واقعی ممنوع.
+
+## پوستهٔ رنگی v2.1 — قرارداد تک‌منبع (after design-skill audit)
+- هر رنگِ JSX فقط از utility توی @theme؛ هگزِ خام فقط در سه استثنا: کامپوزیت‌های گرادیان/سایه، لایهٔ legacy اُپس (patchهای [class~] با ارجاع به کلاس‌های فعلیِ barber/admin)، و atelier.css (تم جداگانهٔ گزارش‌شده).
+- Rampهای عمومی: bone(50→800, +150)، brand(50→950، +900 #10261b و 950 #07170f برای washes هیرو)، brass(50→800، +400 #c59b4b فیل، +600 #855e16).
+- قانون APCA (apca-w3 اندازه‌گیری شد): بدنه ≥75/90، متن ریز ≥60، استروک/فیل UI ≥30؛ «jade on dark» فقط برای fill/خط، متنِ روی تیره = --color-action-text #8fdcbc (−76).
+- ops v2.1: muted #b3bcb3 (−64، قبلاً #8a938b و −42)، danger #e9a9b2 (−64، قبلاً #e09aa3 و −57).
+- طلا به‌عنوان متن روی زمینهٔ روشن ممنوع (#c59b4b روی سفید = Lc 50): همهٔ text-[#c59b4b] → text-brass-700 (77).
+- فاصله‌ها فقط logical (ms/me/ps/pe/start/end)؛ تنها استثنا: جزیرهٔ dir=ltr پیش‌شمارهٔ تلفن در BookingAuthModal.
+- inputهای موبایل: کف ۱۶px با media query (ضد زوم iOS). h1/h2/h3: text-wrap: balance؛ پاراگراف‌ها: pretty. لینک «پرش به محتوا» + :focus-visible حلقهٔ ۲px.

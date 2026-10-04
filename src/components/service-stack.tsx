@@ -30,7 +30,7 @@ export function ServiceStack({ items }: { items: ServiceStackItem[] }) {
           style={{ top: `${92 + i * 20}px`, zIndex: i + 1 }}
         >
           <Reveal>
-            <article className="glass-card overflow-hidden rounded-[2rem] border-2 border-[#c59b4b]/35 shadow-[0_25px_50px_-25px_rgba(15,90,59,0.2)]">
+            <article className="glass-card overflow-hidden rounded-[2rem] border-2 border-brass-400/35 shadow-[0_25px_50px_-25px_rgba(15,90,59,0.2)]">
               <div className="grid md:grid-cols-2">
                 <div className="relative aspect-[4/3] md:aspect-auto md:min-h-[26rem]">
                   <Image
@@ -45,28 +45,28 @@ export function ServiceStack({ items }: { items: ServiceStackItem[] }) {
                     {item.index}
                   </span>
                   <div className="absolute bottom-5 right-5 md:hidden">
-                    <span className="rounded-full bg-[#0f5a3b] px-3.5 py-1 text-xs font-bold text-white shadow">
+                    <span className="rounded-full bg-brand-700 px-3.5 py-1 text-xs font-bold text-white shadow">
                       {item.tagline}
                     </span>
                   </div>
                 </div>
                 <div className="flex flex-col justify-center bg-gradient-to-br from-white via-white/95 to-[#f7f4ec] p-7 md:p-11">
                   <div className="hidden md:flex items-center gap-2">
-                    <span className="h-1.5 w-6 rounded-full bg-[#c59b4b]" />
-                    <p className="text-xs font-bold tracking-[0.35em] text-[#0f5a3b]">
+                    <span className="h-1.5 w-6 rounded-full bg-brass-400" />
+                    <p className="text-xs font-bold tracking-[0.35em] text-brand-700">
                       {item.tagline}
                     </p>
                   </div>
                   <h3 className="mt-3 text-3xl font-black text-bone md:text-4xl">{item.name}</h3>
                   <p className="mt-4 max-w-md text-sm leading-8 text-bone/70">{item.description}</p>
-                  <dl className="mt-6 flex gap-8 border-y border-[#c59b4b]/20 py-4 text-sm">
+                  <dl className="mt-6 flex gap-8 border-y border-brass-400/20 py-4 text-sm">
                     <div>
                       <dt className="text-[11px] font-semibold text-bone/50">مدت زمان</dt>
-                      <dd className="mt-1 font-bold text-[#0f5a3b]">{item.durationMin} دقیقه</dd>
+                      <dd className="mt-1 font-bold text-brand-700">{item.durationMin} دقیقه</dd>
                     </div>
                     <div>
                       <dt className="text-[11px] font-semibold text-bone/50">تعرفه پایه</dt>
-                      <dd className="mt-1 font-black text-[#855e16]">{formatPrice(item.price)}</dd>
+                      <dd className="mt-1 font-black text-brass-600">{formatPrice(item.price)}</dd>
                     </div>
                     <div>
                       <dt className="text-[11px] font-semibold text-bone/50">سطح اجرا</dt>
@@ -76,7 +76,7 @@ export function ServiceStack({ items }: { items: ServiceStackItem[] }) {
                   <div className="mt-7 flex items-center gap-4">
                     <Link
                       href={item.href}
-                      className="focus-ring rounded-full bg-[#0f5a3b] px-8 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#094028] hover:shadow-[0_10px_24px_-4px_rgba(197,155,75,0.6)]"
+                      className="focus-ring rounded-full bg-brand-700 px-8 py-3.5 text-sm font-bold text-white shadow-md transition hover:bg-[#094028] hover:shadow-[0_10px_24px_-4px_rgba(197,155,75,0.6)]"
                     >
                       رزرو این سرویس
                     </Link>

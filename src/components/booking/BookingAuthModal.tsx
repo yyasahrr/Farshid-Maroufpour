@@ -186,13 +186,13 @@ export function BookingAuthModal({
       onClose={onClose}
       aria-label="ورود و ثبت‌نام"
       aria-hidden={!isOpen}
-      className="auth-dialog w-[min(460px,calc(100vw-24px))] rounded-3xl border border-[#e2e5df] bg-white p-6 text-[#1f2e27] shadow-xl sm:p-8"
+      className="auth-dialog w-[min(460px,calc(100vw-24px))] rounded-3xl border border-bone-150 bg-white p-6 text-bone-700 shadow-xl sm:p-8"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e2efe8] text-[#2f4a3a]">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e2efe8] text-brand-400">
           <Icon name={step === "phone" ? "phone" : step === "otp" ? "clock" : "user"} className="h-6 w-6" />
         </div>
-        <button type="button" onClick={() => dialog.current?.close()} aria-label="بستن پنجره ورود" className="focus-ring flex h-11 w-11 items-center justify-center rounded-xl bg-[#f6f5f1]">
+        <button type="button" onClick={() => dialog.current?.close()} aria-label="بستن پنجره ورود" className="focus-ring flex h-11 w-11 items-center justify-center rounded-xl bg-bone-100">
           <Icon name="close" className="h-5 w-5" />
         </button>
       </div>
@@ -200,10 +200,10 @@ export function BookingAuthModal({
       {step === "phone" && (
         <form onSubmit={(event) => void sendOtp(event)} className="mt-6">
           <h2 className="text-2xl font-black">ورود / ثبت‌نام</h2>
-          <p className="mt-1 text-sm leading-7 text-[#5f7168]">شماره موبایل خود را وارد کنید.</p>
+          <p className="mt-1 text-sm leading-7 text-bone-500">شماره موبایل خود را وارد کنید.</p>
           <label htmlFor="auth-phone-input" className="ui-label mt-6">شماره موبایل</label>
-          <div dir="ltr" className="flex items-center gap-2 rounded-2xl border border-[#dfe3e0] bg-[#f6f5f1] px-3 focus-within:border-[#0f5a3b]">
-            <span className="border-r border-[#dfe3e0] pr-2 text-sm font-bold text-[#8a6a1e]">+98</span>
+          <div dir="ltr" className="flex items-center gap-2 rounded-2xl border border-[#dfe3e0] bg-bone-100 px-3 focus-within:border-brand-700">
+            <span className="border-r border-[#dfe3e0] pr-2 text-sm font-bold text-brass-800">+98</span>
             <input
               id="auth-phone-input"
               type="tel"
@@ -220,7 +220,7 @@ export function BookingAuthModal({
           </div>
           {error && <p id="auth-error" role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
           {demoPhoneHint && (
-            <p className="mt-4 rounded-xl bg-[#f7f0d8] px-3 py-2 text-xs leading-6 text-[#6b5213]">
+            <p className="mt-4 rounded-xl bg-brass-50 px-3 py-2 text-xs leading-6 text-brass-700">
               این پیش‌نمایش پیامک واقعی ندارد؛ هر شماره معتبر وارد کنید و کد نمایشی{" "}
               <span dir="ltr" className="inline-block font-bold">123456</span> نمایش داده می‌شود.
             </p>
@@ -234,18 +234,18 @@ export function BookingAuthModal({
       {step === "otp" && (
         <div className="mt-6">
           <h2 className="text-2xl font-black">کد تأیید</h2>
-          <p className="mt-1 text-sm leading-7 text-[#5f7168]">
-            کد ۶رقمی ارسال‌شده به <span dir="ltr" className="inline-block font-semibold text-[#2f4a3a]">{mobile}</span> را وارد کنید.
+          <p className="mt-1 text-sm leading-7 text-bone-500">
+            کد ۶رقمی ارسال‌شده به <span dir="ltr" className="inline-block font-semibold text-brand-400">{mobile}</span> را وارد کنید.
           </p>
           {previewCode && (
-            <div className="mt-4 flex flex-col items-center gap-2 rounded-xl bg-[#f7f0d8] p-3 text-sm font-semibold text-[#6b5213] sm:flex-row sm:justify-between">
+            <div className="mt-4 flex flex-col items-center gap-2 rounded-xl bg-brass-50 p-3 text-sm font-semibold text-brass-700 sm:flex-row sm:justify-between">
               <span>
                 کد ورود این پیش‌نمایش: <span dir="ltr" className="font-mono font-bold tracking-widest">{previewCode}</span>
               </span>
               <button
                 type="button"
                 onClick={() => { setCode(previewCode.split("")); void verify(previewCode); }}
-                className="focus-ring rounded-full bg-[#6b5213] px-4 py-1.5 text-xs font-bold text-white"
+                className="focus-ring rounded-full bg-brass-700 px-4 py-1.5 text-xs font-bold text-white"
               >
                 ورود خودکار
               </button>
@@ -266,21 +266,21 @@ export function BookingAuthModal({
                 type="text"
                 maxLength={1}
                 autoComplete={index === 0 ? "one-time-code" : "off"}
-                className="focus-ring h-12 w-[min(12vw,47px)] rounded-xl border border-[#dfe3e0] bg-[#f6f5f1] text-center text-xl font-bold focus:border-[#0f5a3b]"
+                className="focus-ring h-12 w-[min(12vw,47px)] rounded-xl border border-[#dfe3e0] bg-bone-100 text-center text-xl font-bold focus:border-brand-700"
               />
             ))}
           </div>
           {error && <p role="alert" className="mt-3 text-center text-sm text-rose-700">{error}</p>}
           <div className="mt-5 flex items-center justify-between gap-2 text-sm">
-            <button type="button" onClick={() => { setStep("phone"); setCode(Array(6).fill("")); setError(""); }} className="focus-ring min-h-11 font-semibold text-[#2f4a3a]">
+            <button type="button" onClick={() => { setStep("phone"); setCode(Array(6).fill("")); setError(""); }} className="focus-ring min-h-11 font-semibold text-brand-400">
               ویرایش شماره
             </button>
             {remaining > 0 ? (
-              <span className="text-[#5f7168]" dir="ltr">
+              <span className="text-bone-500" dir="ltr">
                 ارسال دوباره تا {String(Math.floor(remaining / 60)).padStart(2, "0")}:{String(remaining % 60).padStart(2, "0")}
               </span>
             ) : (
-              <button type="button" disabled={busy} onClick={() => void sendOtp()} className="focus-ring min-h-11 font-semibold text-[#2f4a3a]">
+              <button type="button" disabled={busy} onClick={() => void sendOtp()} className="focus-ring min-h-11 font-semibold text-brand-400">
                 ارسال دوباره کد
               </button>
             )}
@@ -294,7 +294,7 @@ export function BookingAuthModal({
       {step === "name" && (
         <form onSubmit={(event) => void saveName(event)} className="mt-6">
           <h2 className="text-2xl font-black">فقط نام شما</h2>
-          <p className="mt-1 text-sm leading-7 text-[#5f7168]">برای نمایش روی رسید نوبت، نام و نام خانوادگی‌تان را بنویسید.</p>
+          <p className="mt-1 text-sm leading-7 text-bone-500">برای نمایش روی رسید نوبت، نام و نام خانوادگی‌تان را بنویسید.</p>
           <label className="ui-label mt-6" htmlFor="auth-name-input">نام و نام خانوادگی</label>
           <input
             id="auth-name-input"

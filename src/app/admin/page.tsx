@@ -511,7 +511,7 @@ export default async function AdminDashboard({
               <tbody>
                 {sorted.map(({ a, barberName, serviceName }) => (
                   <tr key={a.id}>
-                    <td className="ops-ltr text-[13px] font-bold text-[#7ed0ae]">{minutesToLabel(a.startMin)}</td>
+                    <td className="ops-ltr text-[13px] font-bold text-[var(--color-action-text)]">{minutesToLabel(a.startMin)}</td>
                     <td>
                       <span className="font-bold">{a.clientName}</span>
                       <span className="ops-ltr ops-meta block">{a.clientPhone}</span>
@@ -677,7 +677,7 @@ export default async function AdminDashboard({
               <li key={person.id} className="ops-row">
                 <span className="min-w-0">
                   <b>{person.name}</b>
-                  <span className="ops-ltr ops-meta mr-2">{person.phone}</span>
+                  <span className="ops-ltr ops-meta me-2">{person.phone}</span>
                   <span className="mt-1 flex flex-wrap gap-1.5">
                     {person.roles.length ? (
                       person.roles.map((role) => (
@@ -720,7 +720,7 @@ export default async function AdminDashboard({
               <tbody>
                 {serviceRows.map((s) => (
                   <tr key={s.id}>
-                    <td className="font-bold">{s.name}{!s.active && <span className="ops-chip ops-chip-mute mr-2">غیرفعال</span>}</td>
+                    <td className="font-bold">{s.name}{!s.active && <span className="ops-chip ops-chip-mute me-2">غیرفعال</span>}</td>
                     <td className="ops-num">{fa(s.durationMin)} دقیقه</td>
                     <td className="ops-num text-[var(--color-text-secondary)]">{fa(s.barberDurationMin)} دقیقه · بافر {fa(s.bufferMin)}</td>
                     <td className="ops-num font-bold">{formatPrice(s.basePrice)}</td>

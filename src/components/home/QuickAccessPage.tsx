@@ -54,7 +54,7 @@ export function QuickAccessPage({
   }, []);
 
   return (
-    <div ref={root} className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-[#1f2e27] text-white">
+    <div ref={root} className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-bone-700 text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
         <Image src="/images/video-poster.jpg" fill priority sizes="100vw" alt="" className="object-cover object-center" />
         {playVideo && !videoError && (
@@ -94,7 +94,7 @@ export function QuickAccessPage({
           </button>
           <Link
             href="/home"
-            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-[#0f5a3b] transition-colors hover:bg-[#e3f0e9]"
+            className="focus-ring inline-flex min-h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-50"
           >
             ورود به سایت
           </Link>
@@ -129,7 +129,7 @@ export function QuickAccessPage({
             <h2 className="text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
             <p className="mt-1 text-sm leading-6 text-pretty opacity-75">خدمت، آرایشگر و زمان را بردار؛ نام و شماره فقط مرحلهٔ آخر — همان‌جا حساب خودکار ساخته می‌شود.</p>
           </div>
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#e3f0e9] text-[#0f5a3b]">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-brand-50 text-brand-700">
             <Icon name="scissors" className="h-7 w-7" weight="strong" />
           </span>
         </Link>
@@ -193,7 +193,7 @@ export function QuickAccessPage({
       <dialog
         ref={contact}
         aria-labelledby="contact-title"
-        className="auth-dialog w-[min(440px,calc(100vw-24px))] rounded-2xl border border-[#e2e5df] bg-white p-6 text-[#1f2e27] shadow-xl"
+        className="auth-dialog w-[min(440px,calc(100vw-24px))] rounded-2xl border border-bone-150 bg-white p-6 text-bone-700 shadow-xl"
         onClick={(e) => { if (e.target === e.currentTarget) contact.current?.close(); }}
       >
         <div className="flex items-center justify-between">
@@ -203,7 +203,7 @@ export function QuickAccessPage({
           </button>
         </div>
         <p className="mt-6 flex items-start gap-2 text-sm leading-8">
-          <Icon name="location" className="mt-1 h-5 w-5 text-[#0f5a3b]" />
+          <Icon name="location" className="mt-1 h-5 w-5 text-brand-700" />
           {address}
         </p>
         {savedContact && savedContact.lat !== null && savedContact.lng !== null && (
@@ -212,18 +212,18 @@ export function QuickAccessPage({
             src={`/api/neshan/map?lat=${savedContact.lat}&lng=${savedContact.lng}`}
             alt="موقعیت سالن روی نقشه نشان"
             loading="lazy"
-            className="mt-4 h-36 w-full rounded-xl border border-[#e2e5df] object-cover"
+            className="mt-4 h-36 w-full rounded-xl border border-bone-150 object-cover"
             onError={(event) => { event.currentTarget.style.display = "none"; }}
           />
         )}
         {directions && (
-          <a href={directions} target="_blank" rel="noreferrer" className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-[#0f5a3b] underline underline-offset-4">
+          <a href={directions} target="_blank" rel="noreferrer" className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-brand-700 underline underline-offset-4">
             <Icon name="location" className="h-4 w-4" />
             مسیریابی با نشان
           </a>
         )}
         <p className="mt-3 flex items-center gap-2 text-sm">
-          <Icon name="clock" className="h-5 w-5 text-[#0f5a3b]" />
+          <Icon name="clock" className="h-5 w-5 text-brand-700" />
           {OPENING_HOURS}
         </p>
         <a href={`tel:${CONTACT_PHONE_TEL}`} dir="ltr" className="ui-button mt-6 w-full">

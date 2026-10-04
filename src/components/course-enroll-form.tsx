@@ -67,19 +67,19 @@ export function CourseEnrollForm({
 
   if (unavailable)
     return (
-      <div role="status" className="rounded-xl bg-[#f7f0d8] p-4 text-sm font-semibold text-[#6b5213]">
+      <div role="status" className="rounded-xl bg-brass-50 p-4 text-sm font-semibold text-brass-700">
         ثبت‌نام این دوره بسته یا ظرفیت آن تکمیل شده است. دوره‌های دیگر آکادمی را ببینید.
       </div>
     );
 
   if (result)
     return (
-      <div role="status" className="rounded-2xl bg-[#e3f0e9] p-5 text-sm">
+      <div role="status" className="rounded-2xl bg-brand-50 p-5 text-sm">
         <span className="ui-pill ui-tag-academy">
           <Icon name="check" className="h-4 w-4" />
           {result.paymentReference ? "صندلی رزرو شد" : "ثبت‌نام قطعی شد"}
         </span>
-        <p className="mt-3 leading-7 text-[#8a6a1e]">
+        <p className="mt-3 leading-7 text-brass-800">
           {result.paymentReference
             ? "برای باز شدن درس‌ها، شهریه را در صفحه پرداخت تأیید کنید."
             : "همین حالا می‌توانید اولین درس را شروع کنید."}
@@ -109,7 +109,7 @@ export function CourseEnrollForm({
       />
       {!user ? (
         <div>
-          <p className="text-sm leading-7 text-[#5f7168]">
+          <p className="text-sm leading-7 text-bone-500">
             برای ثبت‌نام در دوره‌های آنلاین با شماره موبایل وارد شوید؛ اگر حساب ندارید فقط نام‌تان پرسیده
             می‌شود و کد پیامکی یک‌باری همین‌جا ارسال می‌شود.
           </p>
@@ -119,8 +119,8 @@ export function CourseEnrollForm({
         </div>
       ) : (
         <form onSubmit={(event) => void enroll(event)}>
-          <p className="text-sm leading-7 text-[#5f7168]">
-            ثبت‌نام به نام <b className="text-[#1f2e27]">{user.name}</b> انجام می‌شود
+          <p className="text-sm leading-7 text-bone-500">
+            ثبت‌نام به نام <b className="text-bone-700">{user.name}</b> انجام می‌شود
             {price > 0 ? " و پس از پرداخت شهریه قطعی می‌گردد." : "."}
           </p>
           {error && (
