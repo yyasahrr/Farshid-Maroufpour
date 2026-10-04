@@ -40,3 +40,4 @@ next-env.d.ts
 artifacts/
 playwright-report/
 test-results/
+public/uploads/

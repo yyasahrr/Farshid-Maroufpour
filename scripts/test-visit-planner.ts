@@ -220,7 +220,7 @@ test("barber filter: barber without the skill gets a named reason, not silence",
   );
   assert.equal(out.plan, null);
   assert.equal(out.issues[0].code, "NO_STAFF");
-  assert.match(out.issues[0].message, /رضا این خدمت را ارائه نمی‌دهد/);
+  assert.match(out.issues[0].message, /رضا «رنگ مو» را انجام نمی‌دهد/);
 });
 
 test("different barbers allowed when one lacks the time", () => {
@@ -348,6 +348,86 @@ test("mixed blockers keep the neutral message (no lying about a single cause)", 
   const out = planVisit({ date: "2026-10-06", startMin: 1050, attendees: [{ attendeeId: "primary", serviceIds: [1] }] }, data);
   assert.equal(out.plan, null);
   assert.ok(out.issues.every((i) => !i.message.includes("کلاس")), "must not claim a class when causes differ");
+});
+
+/* ---------- 7. per-service (per-group) barber pins ---------- */
+const groupRules: CombinationRule[] = [{ a: 1, b: 2, canCombine: true, sameBarberRequired: true, note: "مو و ریش یک نفر" }];
+const pinnedData = (rules: CombinationRule[] = groupRules) =>
+  makeData(
+    [
+      { attendee: "primary", serviceId: 1, candidates: [cand(1, haircut), cand(2, haircut)] },
+      { attendee: "primary", serviceId: 2, candidates: [cand(1, beard), cand(2, beard)] },
+      { attendee: "primary", serviceId: 3, candidates: [cand(1, color), cand(2, color)] },
+    ],
+    rules,
+  );
+
+test("group pins: hair+beard on barber 1, colour on barber 2 — still one visit", () => {
+  const out = planVisit(
+    {
+      date: "2026-10-06",
+      startMin: 960,
+      attendees: [{ attendeeId: "primary", serviceIds: [1, 2, 3], servicePins: [{ serviceId: 3, barberId: 2 }] }],
+    },
+    pinnedData(),
+  );
+  assert.ok(out.plan, "plan should exist: " + out.issues.map((i) => i.message).join("|"));
+  const [a, b, c] = out.plan!.segments;
+  assert.equal(a.barberId, 1);
+  assert.equal(c.barberId, 2); // colour on the second barber, chained after
+  assert.equal(out.plan!.startMin, 960); // ONE start time
+});
+
+test("a pin on one cluster member pins the whole cluster", () => {
+  const out = planVisit(
+    {
+      date: "2026-10-06",
+      startMin: null,
+      attendees: [{ attendeeId: "primary", serviceIds: [1, 2], servicePins: [{ serviceId: 1, barberId: 2 }] }],
+    },
+    pinnedData([]),
+  );
+  assert.ok(out.plan);
+  assert.ok(out.plan!.segments.every((seg) => seg.barberId === 2), "both services stay with barber 2");
+});
+
+test("conflicting pins inside a same-barber group are rejected by name", () => {
+  const out = planVisit(
+    {
+      date: "2026-10-06",
+      startMin: null,
+      attendees: [
+        { attendeeId: "primary", serviceIds: [1, 2], servicePins: [{ serviceId: 1, barberId: 1 }, { serviceId: 2, barberId: 2 }] },
+      ],
+    },
+    pinnedData(),
+  );
+  assert.equal(out.plan, null);
+  assert.ok(out.issues.some((i) => i.code === "SAME_BARBER_PIN_CONFLICT"), "conflict issue expected");
+});
+
+test("pin to a barber without the service → named NO_STAFF reason", () => {
+  const data = makeData([{ attendee: "primary", serviceId: 3, candidates: [cand(1, color)] }]);
+  const out = planVisit(
+    { date: "2026-10-06", startMin: null, attendees: [{ attendeeId: "primary", serviceIds: [3], servicePins: [{ serviceId: 3, barberId: 2 }] }] },
+    data,
+  );
+  assert.equal(out.plan, null);
+  assert.equal(out.issues[0].code, "NO_STAFF");
+  assert.match(out.issues[0].message, /رضا «رنگ مو» را انجام نمی‌دهد/);
+});
+
+test("pin fighting the whole-chain barber filter is reported, not silently unscheduled", () => {
+  const out = planVisit(
+    {
+      date: "2026-10-06",
+      startMin: null,
+      attendees: [{ attendeeId: "primary", serviceIds: [1, 2, 3], barberId: 1, servicePins: [{ serviceId: 3, barberId: 2 }] }],
+    },
+    pinnedData(),
+  );
+  assert.equal(out.plan, null);
+  assert.ok(out.issues.some((i) => i.code === "PIN_FILTER_CONFLICT"));
 });
 
 console.log(`\nvisit-planner: ${passed} tests passed`);

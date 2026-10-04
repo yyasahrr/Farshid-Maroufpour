@@ -261,6 +261,118 @@ export const classes = pgTable(
   (t) => [uniqueIndex("classes_slug_idx").on(t.slug)],
 );
 
+/**
+ * Online academy (دوره‌های آنلاین). Live classes stay in `classes`; courses
+ * carry the full LMS shape: syllabus (sections → lessons), teaser + lesson
+ * videos, capacity, reviews and per-student results.
+ */
+export const courses = pgTable(
+  "courses",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    description: text("description").notNull().default(""),
+    /** newline-separated list of what the student will be able to do */
+    outcomes: text("outcomes").notNull().default(""),
+    level: text("level").notNull().default("BEGINNER"),
+    price: integer("price").notNull().default(0),
+    /** 0 = unlimited */
+    capacity: integer("capacity").notNull().default(0),
+    seatsTaken: integer("seatsTaken").notNull().default(0),
+    status: text("status").notNull().default("DRAFT"),
+    teaserVideoUrl: text("teaser_video_url"),
+    posterUrl: text("poster_url"),
+    instructorBarberId: integer("instructor_barber_id").references(() => barbers.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("courses_slug_idx").on(t.slug)],
+);
+
+export const courseSections = pgTable(
+  "course_sections",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [index("course_sections_course_idx").on(t.courseId, t.position)],
+);
+
+export const courseLessons = pgTable(
+  "course_lessons",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    sectionId: integer("section_id").references(() => courseSections.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    videoUrl: text("video_url"),
+    durationMin: integer("duration_min").notNull().default(0),
+    position: integer("position").notNull().default(0),
+    freePreview: boolean("free_preview").notNull().default(false),
+    notes: text("notes").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("course_lessons_course_idx").on(t.courseId, t.position)],
+);
+
+export const courseEnrollments = pgTable(
+  "course_enrollments",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("PENDING"),
+    /** JSON array of lesson ids the student marked as watched */
+    completedLessonIds: text("completed_lesson_ids").notNull().default("[]"),
+    /** out of 20 (Iranian grading), null until the instructor records it */
+    grade: integer("grade"),
+    resultNote: text("result_note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("course_enrollments_course_idx").on(t.courseId, t.status),
+    uniqueIndex("course_enrollment_unique").on(t.courseId, t.userId),
+  ],
+);
+
+export const courseReviews = pgTable(
+  "course_reviews",
+  {
+    id: serial("id").primaryKey(),
+    courseId: integer("course_id")
+      .notNull()
+      .references(() => courses.id, { onDelete: "cascade" }),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    comment: text("comment").notNull().default(""),
+    status: text("status").notNull().default("PENDING"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("course_review_unique").on(t.courseId, t.userId)],
+);
+
+/** Free-form admin-managed site configuration (e.g. the "contact" address). */
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const classRegistrations = pgTable(
   "class_registrations",
   {
@@ -304,7 +416,7 @@ export const payments = pgTable(
   "payments",
   {
     id: serial("id").primaryKey(),
-    kind: text("kind").notNull(), // APPOINTMENT | APPOINTMENT_GROUP | CLASS
+    kind: text("kind").notNull(), // APPOINTMENT | APPOINTMENT_GROUP | CLASS | COURSE
     refId: integer("ref_id").notNull(),
     amount: integer("amount").notNull(),
     status: text("status").notNull().default("PENDING"),

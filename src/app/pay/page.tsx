@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { appointments, barbers, classRegistrations, classes, payments, services } from "@/db/schema";
+import { appointments, barbers, classRegistrations, classes, courseEnrollments, courses, payments, services } from "@/db/schema";
 import { PayButtons } from "@/components/pay-buttons";
 import { PaymentCountdown } from "@/components/payment-countdown";
 import { getCurrentUser } from "@/lib/session";
@@ -54,6 +54,15 @@ export default async function PayPage({ searchParams }: { searchParams: Promise<
       .where(eq(classRegistrations.id, payment.refId)).limit(1);
     if (!registration || registration.phone !== user.phone) notFound();
     heading = registration.title;
+  } else if (payment.kind === "COURSE") {
+    const [registration] = await db
+      .select({ title: courses.title, userId: courseEnrollments.userId })
+      .from(courseEnrollments)
+      .innerJoin(courses, eq(courseEnrollments.courseId, courses.id))
+      .where(eq(courseEnrollments.id, payment.refId))
+      .limit(1);
+    if (!registration || registration.userId !== user.id) notFound();
+    heading = `دورهٔ آنلاین: ${registration.title}`;
   } else notFound();
   const seconds = booking.length ? Math.max(0, Math.ceil((Math.min(...booking.map((item) => item.expiresAt)) - currentEpochMs()) / 1000)) : 1;
   const payable = (payment.status === "PENDING" || payment.status === "FAILED") && seconds > 0;

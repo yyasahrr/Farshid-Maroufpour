@@ -15,7 +15,21 @@ const shortcuts: Shortcut[] = [
   { href: "/shop", title: "فروشگاه", caption: "محصولات پیرایش", icon: "diamond", tone: "shop" },
 ];
 
-export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: AuthUser | null; demoPhoneHint?: string }) {
+export function QuickAccessPage({
+  initialUser,
+  demoPhoneHint,
+  contact: savedContact,
+}: {
+  initialUser: AuthUser | null;
+  demoPhoneHint?: string;
+  /** admin-managed via site_settings (Neshan panel); falls back to constants */
+  contact?: { address: string; lat: number | null; lng: number | null };
+}) {
+  const address = savedContact?.address ?? CONTACT_ADDRESS;
+  const directions =
+    savedContact && savedContact.lat !== null && savedContact.lng !== null
+      ? `https://neshan.org/link/place?ll=${savedContact.lat},${savedContact.lng}&z=17&src=farshid-academy`
+      : null;
   const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
   const [user, setUser] = useState(initialUser);
@@ -167,8 +181,11 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         onAuthenticated={(signedIn) => {
           setUser(signedIn);
           setAuthOpen(false);
+          // an authenticated customer belongs in their account, not dumped in
+          // the booking wizard; staff (OWNER/RECEPTIONIST/…) just stay put and
+          // the page re-renders with their panel links.
           router.refresh();
-          router.push("/booking");
+          if (signedIn.role === "CLIENT") router.push("/account");
         }}
         demoPhoneHint={demoPhoneHint}
       />
@@ -187,8 +204,24 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         </div>
         <p className="mt-6 flex items-start gap-2 text-sm leading-8">
           <Icon name="location" className="mt-1 h-5 w-5 text-[#0f5a3b]" />
-          {CONTACT_ADDRESS}
+          {address}
         </p>
+        {savedContact && savedContact.lat !== null && savedContact.lng !== null && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/neshan/map?lat=${savedContact.lat}&lng=${savedContact.lng}`}
+            alt="موقعیت سالن روی نقشه نشان"
+            loading="lazy"
+            className="mt-4 h-36 w-full rounded-xl border border-[#e2e5df] object-cover"
+            onError={(event) => { event.currentTarget.style.display = "none"; }}
+          />
+        )}
+        {directions && (
+          <a href={directions} target="_blank" rel="noreferrer" className="focus-ring mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-[#0f5a3b] underline underline-offset-4">
+            <Icon name="location" className="h-4 w-4" />
+            مسیریابی با نشان
+          </a>
+        )}
         <p className="mt-3 flex items-center gap-2 text-sm">
           <Icon name="clock" className="h-5 w-5 text-[#0f5a3b]" />
           {OPENING_HOURS}

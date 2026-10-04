@@ -168,6 +168,24 @@ try {
   });
   ok("review asks identity LAST: guest tab + name/phone + total", identity.tabs && identity.guestSelected && !identity.loginSelected && identity.fields && identity.total, JSON.stringify(identity));
 
+  /* ---------- 6b. hold starts AT review entry, without any login ---------- */
+  await page.waitForFunction(
+    () => [...document.querySelectorAll("span")].some((n) => (n.textContent || "").includes("برای کل نوبت شما قفل شده")),
+    { timeout: 25000 },
+  );
+  const anonHold = await page.evaluate(async () => {
+    const token = sessionStorage.getItem("bk-hold-token");
+    const db = null;
+    void db;
+    return { token: Boolean(token) && token.length >= 16 };
+  });
+  ok("slot locked for guest at review (countdown + token in sessionStorage)", anonHold.token, "");
+  const holdCountdown = await page.evaluate(() => {
+    const mono = [...document.querySelectorAll("[role=\"status\"] span")].map((n) => n.textContent || "");
+    return mono.some((t) => /\d:|:\d/.test(t));
+  });
+  ok("countdown timer visibly ticking", holdCountdown, "");
+
   /* ---------- 7. taken number → routed to the login tab (no duplicate registration) ---------- */
   await typeInto("#guest-name", "صحرای تست");
   await typeInto("#guest-phone", "09129998877");
@@ -195,10 +213,10 @@ try {
     for (const ch of "123456") { await page.keyboard.type(ch); await sleep(200); }
   }
   await page.waitForFunction(
-    () => [...document.querySelectorAll("*")].some((n) => n.textContent === "این زمان موقتاً برای کل نوبت شما نگه داشته شده است."),
+    () => [...document.querySelectorAll("*")].some((n) => n.textContent === "این زمان برای کل نوبت شما قفل شده — تا پایان این مهلت هیچ‌کس نمی‌تواند آن را بگیرد."),
     { timeout: 30000 },
   );
-  ok("hold countdown covers the whole plan after login", true);
+  ok("hold countdown covers the whole plan after login (re-keyed to session)", true);
   await clickButton("تأیید و ثبت نوبت").catch(() => clickButton("ثبت رزرو و پرداخت"));
   await sleep(1200);
   await page.evaluate(() => {

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { appointments, classRegistrations, payments } from "@/db/schema";
+import { appointments, classRegistrations, courseEnrollments, payments } from "@/db/schema";
 import { verifyPayment } from "@/lib/payments";
 import { getCurrentUser } from "@/lib/session";
 import { isPaymentDemoMode } from "@/lib/preview";
@@ -29,6 +29,10 @@ export async function processPaymentAction(_prev: PayResult | null, formData: Fo
     const [registration] = await db.select({ phone: classRegistrations.studentPhone }).from(classRegistrations)
       .where(eq(classRegistrations.id, row.refId)).limit(1);
     if (!registration || registration.phone !== user.phone) return { ok: false, message: "دسترسی به این پرداخت ندارید." };
+  } else if (row.kind === "COURSE") {
+    const [enrollment] = await db.select({ userId: courseEnrollments.userId }).from(courseEnrollments)
+      .where(eq(courseEnrollments.id, row.refId)).limit(1);
+    if (!enrollment || enrollment.userId !== user.id) return { ok: false, message: "دسترسی به این پرداخت ندارید." };
   } else return { ok: false, message: "نوع پرداخت نامعتبر است." };
 
   if (row.status === "FAILED") await db.update(payments).set({ status: "PENDING" }).where(eq(payments.id, row.id));
@@ -36,7 +40,14 @@ export async function processPaymentAction(_prev: PayResult | null, formData: Fo
   revalidatePath("/pay");
   revalidatePath("/account");
   if ("error" in result) return { ok: false, message: result.error };
-  if (result.status === "PAID") return { ok: true, message: "پرداخت آزمایشی تأیید شد. نوبت شما قطعی است." };
+  if (result.status === "PAID")
+    return {
+      ok: true,
+      message:
+        row.kind === "COURSE"
+          ? "پرداخت آزمایشی تأیید شد. ثبت‌نام شما در دوره قطعی است."
+          : "پرداخت آزمایشی تأیید شد. نوبت شما قطعی است.",
+    };
   if (result.status === "FAILED") return { ok: false, message: "پرداخت ناموفق بود؛ در صورت باقی‌بودن مهلت، دوباره تلاش کنید." };
   return { ok: false, message: "این پرداخت دیگر قابل انجام نیست." };
 }

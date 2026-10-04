@@ -183,7 +183,10 @@ export function CustomerBooking({
   const [newCompanionName, setNewCompanionName] = useState("");
   const [date, setDate] = useState(initialDate ?? todayISO());
   const [startMin, setStartMin] = useState<number | null>(initialStartMin ?? null);
-  const [barberFilter, setBarberFilter] = useState<number | null>(initialBarberId ?? null);
+  /** step-1 per-group barber choices: key = group's serviceIds joined.
+   *  null means "customer explicitly chose auto for this group" and also
+   *  overrides the deep-link seed. */
+  const [groupPins, setGroupPins] = useState<Record<string, number | null>>({});
   const [category, setCategory] = useState("همه");
   const [search, setSearch] = useState("");
   const [showFullCalendar, setShowFullCalendar] = useState(false);
@@ -210,12 +213,27 @@ export function CustomerBooking({
 
   const [grid, setGrid] = useState<{ key: string; value: PlanResponse | null; error: string | null }>({ key: "", value: null, error: null });
   const [staffPlan, setStaffPlan] = useState<{ key: string; value: PlanResponse | null; error: string | null; stale?: boolean }>({ key: "", value: null, error: null });
-  const [hold, setHold] = useState<{ plan: VisitPlan; expiry: number; left: number } | null>(null);
+  const [hold, setHold] = useState<{ plan: VisitPlan; expiry: number; left: number; keyedBy: "anon" | "phone" | "session" } | null>(null);
   const [holdError, setHoldError] = useState<{ message: string; nearby: number[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<z.infer<typeof receiptSchema> | null>(null);
   const requestId = useRef(0);
   const autoHeldKey = useRef("");
+  /** Anonymous hold identity for the pre-login phase: survives reloads in the
+   *  same tab so the 10-minute lock belongs to this visitor even before they
+   *  type a phone number. */
+  const holdToken = useMemo(() => {
+    const KEY = "bk-hold-token";
+    try {
+      const saved = window.sessionStorage.getItem(KEY);
+      if (saved && /^[A-Za-z0-9_-]{16,64}$/.test(saved)) return saved;
+      const fresh = crypto.randomUUID();
+      window.sessionStorage.setItem(KEY, fresh);
+      return fresh;
+    } catch {
+      return crypto.randomUUID();
+    }
+  }, []);
 
   const stageLabels = ["خدمت", "آرایشگر", "زمان", "بازبینی"];
 
@@ -227,47 +245,96 @@ export function CustomerBooking({
     () => combinationRules.filter((r) => r.sameBarberRequired && primaryIds.includes(r.a) && primaryIds.includes(r.b)),
     [combinationRules, primaryIds],
   );
-  const barberEvaluation = useCallback(
-    (barber: BookingBarberItem) => {
-      const covered = primaryIds.filter((id) => barber.serviceIds.includes(id));
-      const missing = primaryIds.filter((id) => !barber.serviceIds.includes(id));
-      const clusterBlocked = forcedSameBarberPairs.some(
-        (pair) => !barber.serviceIds.includes(pair.a) || !barber.serviceIds.includes(pair.b),
-      );
-      return {
-        covered,
-        missing,
-        eligible: covered.length > 0 && !clusterBlocked,
-        reason: covered.length === 0
-          ? "هیچ‌کدام از خدمات انتخابی شما را انجام نمی‌دهد."
-          : clusterBlocked
-            ? "این خدمات باید حتماً توسط یک آرایشگر انجام شوند و این آرایشگر همهٔ آن‌ها را ندارد."
-            : missing.length > 0
-              ? `${persianNum(covered.length)} خدمت با خودت، ${persianNum(missing.length)} خدمت با همکار — باز هم یک نوبت.`
-              : "همهٔ خدمات انتخابی را انجام می‌دهد.",
-      };
-    },
-    [primaryIds, forcedSameBarberPairs],
-  );
+  /** eligibility of one barber for ONE group of services (the group must stay
+   *  with a single person — that is what same-barber rules mean). */
+  const barberEvaluation = useCallback((barber: BookingBarberItem, serviceIds: number[]) => {
+    const missing = serviceIds.filter((id) => !barber.serviceIds.includes(id));
+    return {
+      eligible: missing.length === 0,
+      missing,
+      reason: missing.length === 0
+        ? serviceIds.length > 1
+          ? "هر دو خدمت را با هم انجام می‌دهد."
+          : "این خدمت را انجام می‌دهد."
+        : serviceIds.length > 1
+          ? `«${missing.map((id) => servicesList.find((x) => x.id === id)?.name ?? "خدمت").join(" و ")}» را ندارد و این گروه باید یک‌نفری باشد.`
+          : "این خدمت را انجام نمی‌دهد.",
+    };
+  }, [servicesList]);
+  /** The primary selection partitioned by same-barber rules: paired services
+   *  form one group, everything else is its own group. One barber per group. */
+  const barberGroups = useMemo(() => {
+    const parent = new Map<number, number>();
+    for (const id of primaryIds) parent.set(id, id);
+    const find = (x: number): number => {
+      let root = x;
+      while (parent.get(root) !== root) root = parent.get(root)!;
+      let walk = x;
+      while (parent.get(walk) !== root) {
+        const next = parent.get(walk)!;
+        parent.set(walk, root);
+        walk = next;
+      }
+      return root;
+    };
+    for (const rule of forcedSameBarberPairs) {
+      const ra = find(rule.a);
+      const rb = find(rule.b);
+      if (ra !== rb) parent.set(ra, rb);
+    }
+    const byRoot = new Map<number, number[]>();
+    for (const id of primaryIds) {
+      const root = find(id);
+      byRoot.set(root, [...(byRoot.get(root) ?? []), id]);
+    }
+    return [...byRoot.values()].map((ids) => ({ key: ids.join("_"), serviceIds: ids }));
+  }, [primaryIds, forcedSameBarberPairs]);
   /** A barber chosen for an older selection must not haunt the new one — the
-   *  pick only applies while still eligible, derived per render, never via
-   *  an effect that resets state. */
-  const activeBarberId = useMemo(() => {
-    if (barberFilter === null) return null;
-    const barber = barbersList.find((b) => b.id === barberFilter);
-    return barber && barberEvaluation(barber).eligible ? barber.id : null;
-  }, [barberFilter, barbersList, barberEvaluation]);
+   *  pin only applies while still eligible, derived per render, never via an
+   *  effect that resets state. */
+  /* deep-link (barber page → wizard): that barber pre-selects every group they
+     can genuinely serve — derived from props so no effect or state seeding is
+     needed, and any explicit click (even "auto") overrides it per group. */
+  const initialBarberSeed = useMemo(() => {
+    if (initialBarberId == null || barbersList.length === 0) return {};
+    const barber = barbersList.find((b) => b.id === initialBarberId);
+    if (!barber) return {};
+    const out: Record<string, number> = {};
+    for (const group of barberGroups) if (barberEvaluation(barber, group.serviceIds).eligible) out[group.key] = barber.id;
+    return out;
+  }, [initialBarberId, barbersList, barberGroups, barberEvaluation]);
+  const activePins = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const group of barberGroups) {
+      const chosen = group.key in groupPins ? groupPins[group.key] : initialBarberSeed[group.key] ?? null;
+      if (chosen == null) continue;
+      const barber = barbersList.find((b) => b.id === chosen);
+      if (barber && barberEvaluation(barber, group.serviceIds).eligible) out[group.key] = chosen;
+    }
+    return out;
+  }, [groupPins, initialBarberSeed, barberGroups, barbersList, barberEvaluation]);
+  /** flattened {serviceId, barberId} payload for plan/hold/group requests */
+  const primaryPins = useMemo(
+    () =>
+      barberGroups.flatMap((group) =>
+        activePins[group.key] !== undefined
+          ? group.serviceIds.map((serviceId) => ({ serviceId, barberId: activePins[group.key] }))
+          : [],
+      ),
+    [barberGroups, activePins],
+  );
+  const hasPinnedBarber = primaryPins.length > 0;
 
   const attendeesSpec = useMemo(() => {
-    const list: { attendeeId: string; serviceIds: number[]; barberId: number | null }[] = [
-      { attendeeId: "primary", serviceIds: selected.primary ?? [], barberId: activeBarberId },
+    const list: { attendeeId: string; serviceIds: number[]; barberId: number | null; servicePins?: { serviceId: number; barberId: number }[] }[] = [
+      { attendeeId: "primary", serviceIds: selected.primary ?? [], barberId: null, servicePins: primaryPins },
     ];
     for (const companion of companions) {
       const ids = selected[companion.id] ?? [];
       if (ids.length > 0) list.push({ attendeeId: companion.id, serviceIds: ids, barberId: null });
     }
     return list.filter((a) => a.serviceIds.length > 0);
-  }, [selected, activeBarberId, companions]);
+  }, [selected, primaryPins, companions]);
 
   const totalMinutes = attendeesSpec.reduce((sum, a) => {
     return sum + a.serviceIds.reduce((s, id) => s + (servicesList.find((x) => x.id === id)?.durationMin ?? 0), 0);
@@ -410,6 +477,24 @@ export function CustomerBooking({
     return () => window.clearInterval(timer);
   }, [step, holdExpiry]);
 
+  /* the window closed while the customer was still deciding: re-arm the hold
+     quietly (the planner re-checks everything server-side; if somebody took
+     the slot we fall back to "نزدیک‌ترین زمان‌ها" without clearing the pick). */
+  useEffect(() => {
+    if (step !== 3 || !hold || hold.left > 0) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      autoHeldKey.current = "";
+      setHold(null);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+     
+  }, [step, hold]);
+
   useEffect(() => {
     if (!initialUser) return;
     let cancelled = false;
@@ -442,6 +527,7 @@ export function CustomerBooking({
           startMin,
           attendees: attendeesSpec,
           ...(contactPhone ? { contactPhone } : {}),
+          holdToken,
         }),
       });
       const json: unknown = await response.json();
@@ -460,7 +546,12 @@ export function CustomerBooking({
         return false;
       }
       setHoldError(null);
-      setHold({ plan: result.data.plan, expiry: new Date(result.data.expiresAt).getTime(), left: result.data.holdDurationSec });
+      setHold({
+        plan: result.data.plan,
+        expiry: new Date(result.data.expiresAt).getTime(),
+        left: result.data.holdDurationSec,
+        keyedBy: user ? "session" : contactPhone ? "phone" : "anon",
+      });
       return true;
     } catch {
       setHoldError({ message: "نگهداری زمان انجام نشد؛ اتصال برقرار نیست.", nearby: [] });
@@ -470,19 +561,20 @@ export function CustomerBooking({
       setBusy(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attendeesSpec, startMin, date, busy]);
+  }, [attendeesSpec, startMin, date, busy, user, holdToken]);
 
-  /* logged-in customers get the hold quietly as soon as the review has a plan */
+  /* the review step locks the WHOLE plan for 10 minutes right away — logged-in
+     or anonymous; nobody else can take the slot while identity/payment happen */
   useEffect(() => {
-    if (step !== 3 || !user || startMin === null || busy) return;
-    if (!planValue?.plan || (hold && hold.left > 0)) return;
+    if (step !== 3 || startMin === null || busy || attendeesSpec.length === 0) return;
+    if (hold && hold.left > 0) return;
     if (autoHeldKey.current === planKey) return;
     autoHeldKey.current = planKey;
-    void waitForHold();
+    void waitForHold(!user && /^09\d{9}$/.test(localMobile(guestPhone)) ? localMobile(guestPhone) : undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, user, startMin, planValue?.plan, hold?.left, planKey]);
+  }, [step, startMin, planKey, hold?.left, user, guestPhone]);
 
-  async function submit(primaryName: string) {
+  async function submit(primaryName: string, allowRetry = true): Promise<void> {
     if (busy || startMin === null || !hold || hold.left < 1) return;
     setBusy(true);
     try {
@@ -492,6 +584,7 @@ export function CustomerBooking({
         body: JSON.stringify({
           date,
           startMin,
+          holdToken,
           attendees: attendeesSpec.map((a) => ({
             attendeeId: a.attendeeId,
             attendeeName: a.attendeeId === "primary" ? primaryName || "مشتری" : companions.find((c) => c.id === a.attendeeId)?.name ?? "همراه",
@@ -504,6 +597,18 @@ export function CustomerBooking({
       if (!response.ok) {
         const failure = z.object({ error: z.string().optional(), nearby: z.array(z.number()).optional() }).safeParse(json);
         const message = failure.data?.error ?? "ثبت نوبت انجام نشد؛ زمان‌ها دوباره بررسی می‌شوند.";
+        // The 10-minute window closed between review and pay: grab the time
+        // again and retry ONCE before bothering the customer.
+        if (allowRetry && /مهلت|نگهداری/.test(message) && failure.data?.nearby?.length !== 0) {
+          setBusy(false);
+          const reheld = await waitForHold(user ? undefined : localMobile(guestPhone) || undefined);
+          if (reheld) {
+            setBusy(true);
+            await submit(primaryName, false);
+            return;
+          }
+          setBusy(true);
+        }
         setHold(null);
         setHoldError({ message, nearby: failure.data?.nearby ?? [] });
         toast.push(message, "error");
@@ -517,6 +622,7 @@ export function CustomerBooking({
       }
       setReceipt(parsed.data);
       setHold(null);
+      try { window.sessionStorage.removeItem("bk-hold-token"); } catch {}
       setStep(4);
       toast.push(parsed.data.visit.totalMinutes > 0 ? "نوبت شما ثبت شد." : "نوبت ثبت شد.", "success");
       router.refresh();
@@ -741,7 +847,7 @@ export function CustomerBooking({
     setActiveAttendee("primary");
     setDate(todayISO());
     setStartMin(null);
-    setBarberFilter(null);
+    setGroupPins({});
     setHold(null);
     setHoldError(null);
     setSwapNote(null);
@@ -821,9 +927,13 @@ export function CustomerBooking({
   /* ================= shell ================= */
   const remaining = Math.max(0, Math.ceil((cooldownUntil - clock) / 1000));
   const loginMobileValid = /^09\d{9}$/.test(localMobile(loginPhone));
-  const barberLabel = activeBarberId === null
-    ? "هر آرایشگری"
-    : barbersList.find((b) => b.id === activeBarberId)?.name ?? "هر آرایشگری";
+  const barberNames = barberGroups
+    .map((group) => (activePins[group.key] !== undefined ? barbersList.find((b) => b.id === activePins[group.key])?.name ?? null : null))
+    .filter((n): n is string => n !== null);
+  const uniqueBarberNames = [...new Set(barberNames)];
+  const barberLabel = uniqueBarberNames.length === 0
+    ? "هر آرایشگری — خودکار"
+    : uniqueBarberNames.join(" و ") + (barberGroups.every((group) => activePins[group.key] !== undefined) ? "" : " · بقیه خودکار");
 
   return (
     <div className="mx-auto max-w-[720px] px-4 pb-40 pt-5 sm:px-6 sm:pb-32 sm:pt-9">
@@ -988,51 +1098,83 @@ export function CustomerBooking({
         <section aria-labelledby="barber-title">
           <div className="ui-pagehead">
             <h1 id="barber-title">با چه آرایشگری؟</h1>
-            <p>{persianNum(primaryIds.length)} خدمت انتخابی — یک نفر را بردار یا بگذار سالن بهترین چیدمان را بچیند.</p>
+            <p>
+              {persianNum(primaryIds.length)} خدمت انتخابی — برای هر گروه یک نفر را بردار یا بگذار سالن بهترین چیدمان را بچیند.
+            </p>
           </div>
 
-          <div role="group" aria-label="انتخاب آرایشگر" className="mt-4 space-y-2">
-            <button
-              type="button"
-              data-barber-card="any"
-              onClick={() => setBarberFilter(null)}
-              aria-pressed={activeBarberId === null}
-              className={`bk-row w-full text-right ${activeBarberId === null ? "bk-row-on" : ""}`}
-            >
-              <div className="min-w-0 flex-1">
-                <strong className="block text-[15px] font-bold">هر آرایشگری — خودکار</strong>
-                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">بهترین زمان ممکن با هر آرایشگری که هر دو خدماتت را پوشش بدهد.</p>
-              </div>
-              {activeBarberId === null && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب سیستم</span>}
-            </button>
-            {barbersList.map((barber) => {
-              const evaluation = barberEvaluation(barber);
-              const isOn = activeBarberId === barber.id;
-              return (
-                <button
-                  key={barber.id}
-                  type="button"
-                  data-barber-card={barber.slug ?? barber.id}
-                  onClick={() => evaluation.eligible && setBarberFilter(barber.id)}
-                  aria-pressed={isOn}
-                  disabled={!evaluation.eligible}
-                  className={`bk-row w-full text-right ${isOn ? "bk-row-on" : ""} ${!evaluation.eligible ? "bk-row-disabled" : ""}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <strong className="block text-[15px] font-bold">{barber.name}</strong>
-                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{barber.title || "پیرایش مردانه"}</p>
-                    <p className={`mt-1.5 text-xs font-semibold ${evaluation.eligible ? (evaluation.missing.length > 0 ? "text-[var(--color-warning)]" : "text-[var(--color-success)]") : "text-[var(--color-warning)]"}`}>
-                      {evaluation.reason}
-                    </p>
+          {barberGroups.length === 0 ? (
+            <div className="ui-panel text-sm leading-7 text-[var(--color-text-muted)]">اول از مرحلهٔ قبل یک خدمت انتخاب کن.</div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {barberGroups.map((group) => {
+                const names = group.serviceIds.map((id) => servicesList.find((x) => x.id === id)?.name ?? "خدمت");
+                const groupLabel = names.join(" و ");
+                const auto = activePins[group.key] === undefined;
+                const pinFor = (barber: BookingBarberItem) =>
+                  group.serviceIds.every((id) => barber.serviceIds.includes(id));
+                return (
+                  <div key={group.key} className="ui-panel !p-0" data-barber-group={group.key}>
+                    <div className="flex items-baseline justify-between gap-2 border-b border-[var(--color-hairline)] px-4 py-3">
+                      <strong className="text-sm font-black">{groupLabel}</strong>
+                      {group.serviceIds.length > 1 && (
+                        <span className="shrink-0 rounded-pill bg-[var(--color-surface-sunken)] px-2.5 py-0.5 text-[10px] font-black text-[var(--color-text-muted)]">
+                          یک آرایشگر برای همه
+                        </span>
+                      )}
+                    </div>
+                    <div role="group" aria-label={`انتخاب آرایشگر برای ${groupLabel}`} className="divide-y divide-[var(--color-hairline)]">
+                      <button
+                        type="button"
+                        data-barber-card="any"
+                        onClick={() => setGroupPins((previous) => ({ ...previous, [group.key]: null }))}
+                        aria-pressed={auto}
+                        className={`bk-row w-full text-right ${auto ? "bk-row-on" : ""}`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <strong className="block text-[15px] font-bold">خودکار — سالن بچیند</strong>
+                          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                            بهترین زمان با هر آرایشگری که این {group.serviceIds.length > 1 ? "گروه را کامل" : "خدمت"} را پوشش بدهد.
+                          </p>
+                        </div>
+                        {auto && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب سیستم</span>}
+                      </button>
+                      {barbersList.map((barber) => {
+                        const eligible = pinFor(barber);
+                        const evaluation = barberEvaluation(barber, group.serviceIds);
+                        const isOn = activePins[group.key] === barber.id;
+                        return (
+                          <button
+                            key={barber.id}
+                            type="button"
+                            data-barber-card={barber.slug ?? barber.id}
+                            onClick={() =>
+                              eligible
+                                ? setGroupPins((previous) => ({ ...previous, [group.key]: isOn ? null : barber.id }))
+                                : undefined
+                            }
+                            aria-pressed={isOn}
+                            disabled={!eligible}
+                            className={`bk-row w-full text-right ${isOn ? "bk-row-on" : ""} ${!eligible ? "bk-row-disabled" : ""}`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <strong className="block text-[15px] font-bold">{barber.name}</strong>
+                              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{barber.title || "پیرایش مردانه"}</p>
+                              <p className={`mt-1.5 text-xs font-semibold ${eligible ? "text-[var(--color-success)]" : "text-[var(--color-warning)]"}`}>{evaluation.reason}</p>
+                            </div>
+                            {isOn && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب تو</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  {isOn && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب تو</span>}
-                </button>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <p className="mt-3 text-xs leading-6 text-[var(--color-text-muted)]">
-            حتی اگر خدماتت بین دو آرایشگر تقسیم شود، یک نوبت پشت‌سرهم برای شما چیده می‌شود — ساعت‌های جداگانه وجود ندارد.
+            خدماتی که به هم گره خورده‌اند (مثل مو و ریش) یک گروه‌اند و حتماً یک نفر انجامشان می‌دهد؛ برای گروه‌های دیگر می‌توانی آرایشگر جدا برداری — باز هم همه در یک نوبت پشت‌سرهم، با یک ساعت شروع.
           </p>
 
           <div className="safe-bottom bk-sticky">
@@ -1094,7 +1236,7 @@ export function CustomerBooking({
               <TimeGridSkeleton />
             ) : (gridValue?.validStarts.length ?? 0) === 0 ? (
               <div role="status" className="ui-panel text-sm leading-7 text-[var(--color-text-muted)]">
-                برای {formatPersianDate(date)} {activeBarberId !== null ? `ساعت آزایی برای ${barberLabel} پیدا نشد` : "زمان آزادی که کل این خدمات را پوشش بدهد پیدا نشد"}. روز دیگری را امتحان کنید{activeBarberId !== null ? " یا آرایشگر را عوض کنید" : ""}؛ خدمات را هم می‌توان کم کرد.
+                برای {formatPersianDate(date)} {hasPinnedBarber ? `ساعت آزایی با ${barberLabel} پیدا نشد` : "زمان آزادی که کل این خدمات را پوشش بدهد پیدا نشد"}. روز دیگری را امتحان کنید{hasPinnedBarber ? " یا آرایشگر گروه‌ها را عوض کنید" : ""}؛ خدمات را هم می‌توان کم کرد.
               </div>
             ) : (
               <TimeGrid
@@ -1161,7 +1303,9 @@ export function CustomerBooking({
                   </div>
                   <div>
                     <label className="ui-label" htmlFor="guest-phone">شماره تلفن همراه</label>
-                    <input id="guest-phone" dir="ltr" inputMode="tel" value={guestPhone} onChange={(e) => { setGuestPhone(e.target.value); setTabError(null); }} autoComplete="tel" placeholder="0912 345 6789" className="ui-input text-left" />
+                    <input id="guest-phone" dir="ltr" inputMode="tel" value={guestPhone} onChange={(e) => { setGuestPhone(e.target.value); setTabError(null); }}
+                       onBlur={(e) => { const v = localMobile(e.target.value); if (v && /^09\d{9}$/.test(v) && hold?.keyedBy === "anon") void waitForHold(v); }}
+                       autoComplete="tel" placeholder="0912 345 6789" className="ui-input text-left" />
                   </div>
                 </div>
               ) : otpStage === "phone" ? (
@@ -1222,7 +1366,7 @@ export function CustomerBooking({
 
           {hold && (
             <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[16px] border p-4 text-sm font-semibold ${hold.left > 0 ? "border-[var(--color-accent-line)] bg-[var(--color-accent-soft)] text-[var(--color-action-primary)]" : "border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] text-[var(--color-danger)]"}`}>
-              <span>{hold.left > 0 ? "این زمان موقتاً برای کل نوبت شما نگه داشته شده است." : "مهلت نگه‌داشتن تمام شد؛ با همان اطلاعات، زمان دوباره گرفته می‌شود."}</span>
+              <span>{hold.left > 0 ? "این زمان برای کل نوبت شما قفل شده — تا پایان این مهلت هیچ‌کس نمی‌تواند آن را بگیرد." : "مهلت نگه‌داشتن تمام شد؛ با همان اطلاعات، زمان دوباره گرفته می‌شود."}</span>
               <span dir="ltr" className="font-mono text-lg tabular-nums">
                 {String(Math.floor(hold.left / 60)).padStart(2, "0")}:{String(hold.left % 60).padStart(2, "0")}
               </span>
@@ -1230,7 +1374,7 @@ export function CustomerBooking({
           )}
           {!hold && !user && reviewPlan && (
             <p className="mb-4 rounded-[16px] bg-[var(--color-accent-soft)] p-4 text-sm leading-7 text-[var(--color-text-secondary)]">
-              زمان انتخابی هنوز برای کسی رزرو نشده؛ با زدن دکمهٔ پایین، اول همین ساعت برای کل نوبت نگه داشته و بعد ثبت می‌شود.
+              همین‌جا این ساعت برای ۱۰ دقیقه برای شما قفل می‌شود و تا قبل از پرداخت، هیچ‌کس نمی‌تواند رزروش کند.
             </p>
           )}
 
@@ -1258,7 +1402,7 @@ export function CustomerBooking({
             <div className="ui-panel">
               <p className="text-sm leading-7 text-[var(--color-text-muted)]">
                 {planError ?? planValue?.issues?.[0]?.message ??
-                  (activeBarberId !== null
+                  (hasPinnedBarber
                     ? `${barberLabel} در این ساعت برای کل این خدمات آزاد نیست.`
                     : "این ساعت پر شده است.")}
               </p>

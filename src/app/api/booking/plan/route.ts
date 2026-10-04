@@ -21,6 +21,11 @@ const AttendeeSchema = z.object({
   attendeeId: z.string().trim().min(1).max(80),
   serviceIds: z.array(z.number().int().positive()).min(1).max(12),
   barberId: z.number().int().positive().nullable().optional(),
+  servicePins: z
+    .array(z.object({ serviceId: z.number().int().positive(), barberId: z.number().int().positive() }))
+    .max(24)
+    .nullable()
+    .optional(),
 });
 
 export const PlanRequestBody = z.object({

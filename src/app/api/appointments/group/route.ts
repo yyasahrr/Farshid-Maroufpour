@@ -27,12 +27,19 @@ const AttendeeSchema = z.object({
   attendeeName: z.string().trim().min(2).max(60),
   serviceIds: z.array(z.number().int().positive()).min(1).max(12),
   barberId: z.number().int().positive().nullable().optional(),
+  servicePins: z
+    .array(z.object({ serviceId: z.number().int().positive(), barberId: z.number().int().positive() }))
+    .max(24)
+    .nullable()
+    .optional(),
 });
 
 export const GroupRequestBody = z.object({
   date: z.string().refine(isValidISODate, "تاریخ نامعتبر است"),
   startMin: z.number().int().min(0).max(1439),
   attendees: z.array(AttendeeSchema).min(1).max(12),
+  /** Transfers the wizard's pre-login anonymous hold to this account. */
+  holdToken: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional(),
 });
 
 export async function POST(request: Request) {
@@ -55,7 +62,7 @@ export async function POST(request: Request) {
   if (!rateLimit(`appointment-group:${user.id}`, 4, 60_000))
     return NextResponse.json({ error: "درخواست‌های بیش از حد؛ یک دقیقه صبر کنید." }, { status: 429 });
 
-  const { date, startMin, attendees } = parsed.data;
+  const { date, startMin, attendees, holdToken } = parsed.data;
   const today = todayISO();
   if (date < today || date > addDaysISO(today, 60))
     return NextResponse.json({ error: "تاریخ نوبت‌ها باید در ۶۰ روز آینده باشد." }, { status: 400 });
@@ -63,6 +70,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "شرکت‌کننده تکراری است." }, { status: 400 });
 
   try {
+    // Guest checkout: the slot was secured pre-login under the browser token.
+    // Re-key those holds to this phone BEFORE the transaction starts — the
+    // planner reads on its own connection, and an uncommitted update inside
+    // the tx would be invisible to it (our own hold would look like somebody
+    // else's). Losing this update on a later rollback is harmless: the rows
+    // stay owned by this phone and fullyHeld/retry still match them.
+    if (holdToken)
+      await db
+        .update(bookingHolds)
+        .set({ clientPhone: user.phone })
+        .where(and(
+          eq(bookingHolds.clientPhone, `anon:${holdToken}`),
+          gt(bookingHolds.expiresAt, new Date()),
+        ));
+
     const result = await db.transaction(async (tx) => {
       // Free slots held by long-expired unpaid pendings before we claim them.
       await sweepExpiredPending(tx);

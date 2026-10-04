@@ -32,12 +32,18 @@ export type BarberCandidate = {
   service: ResolvedService;
 };
 
+export type ServicePin = { serviceId: number; barberId: number };
+
 export type AttendeeRequest = {
   attendeeId: string;
   /** Ordered selection — the chain is planned in this order. */
   serviceIds: number[];
   /** Pin the whole attendee chain to one staff member (barber-filter UX). */
   barberId?: number | null;
+  /** Per-service barber choices (step 1 of the wizard). Cluster members that
+   *  share a rule inherit the pin of their group; conflicts are rejected in
+   *  planVisit before anything is scheduled. */
+  servicePins?: ServicePin[] | null;
 };
 
 export type VisitRequest = {
@@ -121,6 +127,8 @@ export type PlanIssue = {
   code:
     | "COMBINATION_NOT_ALLOWED"
     | "SAME_BARBER_UNAVAILABLE"
+    | "SAME_BARBER_PIN_CONFLICT"
+    | "PIN_FILTER_CONFLICT"
     | "NO_STAFF"
     | "NO_CAPACITY_AT_TIME"
     | "PAST_OR_TOO_LATE"
@@ -251,7 +259,9 @@ function greedyPass(
 
   for (const serviceId of attendee.serviceIds) {
     const cluster = clusterOf.get(serviceId);
-    const clusterBarber = cluster !== undefined ? pinned.get(serviceId) : undefined;
+    // A pinned barber (explicit choice or learned cluster owner) filters
+    // candidates outright — explicit pins can never be overwritten here.
+    const clusterBarber: number | undefined = pinned.get(serviceId);
     const options: BarberCandidate[] = (data.candidates.get(`${attendee.attendeeId}:${serviceId}`) ?? [])
       .filter((c) => !attendee.barberId || c.barberId === attendee.barberId)
       .filter((c) => clusterBarber === undefined || c.barberId === clusterBarber);
@@ -315,7 +325,7 @@ function greedyPass(
       mine.push({ barberId: candidate.barberId, start, end: barberEnd });
       segments.push(placed);
       if (cluster !== undefined) {
-        for (const member of clusters[cluster]) pinned.set(member, candidate.barberId);
+        for (const member of clusters[cluster]) if (!pinned.has(member)) pinned.set(member, candidate.barberId);
       }
       cursor = parallel ? Math.max(cursor, clientEnd, previous!.clientEndMin) : clientEnd;
       previous = placed;
@@ -340,14 +350,25 @@ function scheduleAttendee(
     for (const member of members) clusterOf.set(member, index);
   });
 
-  // Fast path: greedy, cluster learned mid-chain.
-  const fast = greedyPass(attendee, attempt, new Map(), clusterOf, clusters);
+  // Explicit per-service choices, expanded across same-barber clusters so the
+  // whole group inherits its customer-picked barber.
+  const explicit = new Map<number, number>();
+  for (const pin of attendee.servicePins ?? []) {
+    if (!attendee.serviceIds.includes(pin.serviceId)) continue;
+    explicit.set(pin.serviceId, pin.barberId);
+    const cluster = clusterOf.get(pin.serviceId);
+    if (cluster !== undefined) for (const member of clusters[cluster]) explicit.set(member, pin.barberId);
+  }
+
+  // Fast path: greedy (honoring explicit pins), cluster learned mid-chain.
+  const fast = greedyPass(attendee, attempt, explicit, clusterOf, clusters);
   if (fast) return fast;
   if (clusters.length === 0) return null;
 
   // Retry: pin shared barbers for the biggest cluster explicitly (e.g. the
   // groom's haircut+beard must land on one barber even when greedy split them).
-  const pinnedClusters = clusters.filter((c) => c.length > 1);
+  // Clusters the customer already pinned are excluded — their barber is fixed.
+  const pinnedClusters = clusters.filter((c) => c.length > 1 && !c.some((id) => explicit.has(id)));
   if (pinnedClusters.length === 0) return null;
   const barberSets = pinnedClusters.map((cluster) => {
     const sets = cluster.map((id) =>
@@ -358,7 +379,7 @@ function scheduleAttendee(
     const [first, ...rest] = sets;
     return [...new Set(first ?? [])].filter((b) => rest.every((s) => s.includes(b)));
   });
-  let combos: Map<number, number>[] = [new Map()];
+  let combos: Map<number, number>[] = [new Map(explicit)];
   for (let i = 0; i < barberSets.length; i += 1) {
     const next: Map<number, number>[] = [];
     for (const base in combos) {
@@ -479,16 +500,54 @@ export function planVisit(request: VisitRequest, data: PlannerData): PlanOutcome
   for (const attendee of attendees) {
     issues.push(...selectionIssues(attendee.serviceIds, data.rules, data));
   }
+  // Customer-picked barbers per service: a pin only keeps candidates of that
+  // barber, so validate (a) the barber actually performs the service and
+  // (b) grouped (same-barber) services were not pinned to different people.
+  const pinOf = new Map<string, number>();
+  for (const attendee of attendees) {
+    for (const pin of attendee.servicePins ?? []) {
+      if (!attendee.serviceIds.includes(pin.serviceId)) continue;
+      pinOf.set(`${attendee.attendeeId}:${pin.serviceId}`, pin.barberId);
+      if (attendee.barberId && attendee.barberId !== pin.barberId)
+        issues.push({
+          code: "PIN_FILTER_CONFLICT",
+          message: "آرایشگر انتخابیِ این خدمت با آرایشگر کل نوبت فرق دارد؛ یکی را بردارید.",
+          serviceIds: [pin.serviceId],
+        });
+    }
+  }
+  for (const attendee of attendees) {
+    for (const cluster of sameBarberClusters(attendee.serviceIds, data.rules)) {
+      if (cluster.length < 2) continue;
+      const picked = new Set(
+        cluster
+          .map((id) => pinOf.get(`${attendee.attendeeId}:${id}`))
+          .filter((b): b is number => b !== undefined),
+      );
+      if (picked.size > 1)
+        issues.push({
+          code: "SAME_BARBER_PIN_CONFLICT",
+          message: `«${cluster.map((id) => nameOfService(data, id)).join(" و ")}» باید همان یک آرایشگر را داشته باشند؛ برای همهٔ این گروه یک نفر را انتخاب کنید.`,
+          serviceIds: cluster,
+        });
+    }
+  }
   for (const attendee of attendees) {
     for (const serviceId of attendee.serviceIds) {
+      const pin = pinOf.get(`${attendee.attendeeId}:${serviceId}`);
       const options = (data.candidates.get(`${attendee.attendeeId}:${serviceId}`) ?? [])
-        .filter((c) => !attendee.barberId || c.barberId === attendee.barberId);
+        .filter((c) => !attendee.barberId || c.barberId === attendee.barberId)
+        .filter((c) => pin === undefined || c.barberId === pin);
       if (options.length === 0) {
-        const pinned = attendee.barberId ? data.barberNames?.get(attendee.barberId) : undefined;
+        const pinned = pin
+          ? data.barberNames?.get(pin)
+          : attendee.barberId
+            ? data.barberNames?.get(attendee.barberId)
+            : undefined;
         issues.push({
           code: "NO_STAFF",
           message: pinned
-            ? `${pinned} این خدمت را ارائه نمی‌دهد؛ یک آرایشگر دیگر انتخاب کنید.`
+            ? `${pinned} «${nameOfService(data, serviceId)}» را انجام نمی‌دهد؛ یک آرایشگر دیگر انتخاب کنید.`
             : `برای «${nameOfService(data, serviceId)}» در حال حاضر آرایشگر واجد شرایطی موجود نیست.`,
           serviceIds: [serviceId],
         });

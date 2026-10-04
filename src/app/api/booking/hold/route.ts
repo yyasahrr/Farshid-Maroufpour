@@ -24,6 +24,11 @@ const AttendeeSchema = z.object({
   attendeeId: z.string().trim().min(1).max(80),
   serviceIds: z.array(z.number().int().positive()).min(1).max(12),
   barberId: z.number().int().positive().nullable().optional(),
+  servicePins: z
+    .array(z.object({ serviceId: z.number().int().positive(), barberId: z.number().int().positive() }))
+    .max(24)
+    .nullable()
+    .optional(),
 });
 
 const HoldSchema = z.object({
@@ -33,6 +38,9 @@ const HoldSchema = z.object({
   /** Guest checkout: holds are keyed by phone, so an unauthenticated wizard can
    *  secure the plan with the same phone it will later register with. */
   contactPhone: z.string().trim().max(20).optional(),
+  /** Before any phone is typed the wizard holds the slot under a random
+   *  browser token; the same token re-keys the hold to the phone on submit. */
+  holdToken: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional(),
 });
 
 const HOLD_SECONDS = 10 * 60;
@@ -51,7 +59,9 @@ export async function POST(request: Request) {
   // the review step. Keyed by phone either way, so a later login/guest account
   // with the same number inherits the hold untouched.
   const user = await getCurrentUser();
-  const phone = user?.phone ?? normalizeIranianMobile(parsed.data.contactPhone ?? "");
+  const { holdToken } = parsed.data;
+  const anonKey = holdToken ? `anon:${holdToken}` : null;
+  const phone = user?.phone ?? normalizeIranianMobile(parsed.data.contactPhone ?? "") ?? anonKey;
   if (!phone)
     return NextResponse.json(
       { error: user ? "حساب شما شمارهٔ معتبر ندارد." : "برای نگه‌داشتن زمان، شماره موبایل لازم است." },
@@ -62,13 +72,17 @@ export async function POST(request: Request) {
   const { date, startMin, attendees } = parsed.data;
   if (date < today || date > addDaysISO(today, 60))
     return NextResponse.json({ error: "تاریخ باید در ۶۰ روز آینده باشد." }, { status: 400 });
-  if (!rateLimit(user ? `hold:user:${user.id}` : `hold:phone:${phone}`, 12, 60_000))
+  if (!rateLimit(user ? `hold:user:${user.id}` : `hold:key:${phone}`, 12, 60_000))
     return NextResponse.json({ error: "درخواست‌های بیش از حد؛ یک دقیقه صبر کنید." }, { status: 429 });
 
 
   try {
     // Expire abandoned unauthenticated holds and stale pending rows first.
     await db.delete(bookingHolds).where(lt(bookingHolds.expiresAt, new Date()));
+    // Re-keying (token hold → phone hold): the anon rows are ours; clear them
+    // so the fresh hold below is not blocked by its own previous claim.
+    if (anonKey && anonKey !== phone)
+      await db.delete(bookingHolds).where(eq(bookingHolds.clientPhone, anonKey));
     await db.update(appointments).set({ status: "CANCELLED_BY_CLIENT" }).where(and(
       eq(appointments.status, "PENDING"),
       lt(appointments.createdAt, new Date(Date.now() - HOLD_SECONDS * 1000)),

@@ -23,6 +23,10 @@ import {
 import { LiveSalonTimeline, type TimelineBlock, type TimelineRow } from "@/components/admin/live-salon-timeline";
 import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
+import { CourseAdminPanel } from "@/components/admin/course-admin";
+import { ContactAdmin } from "@/components/admin/contact-admin";
+import { getSiteContact, neshanApiKey } from "@/lib/site-settings";
+import { setSiteContactAction } from "@/lib/actions/courses";
 import { ActionForm, Field } from "@/components/action-form";
 import { BookingFlow } from "@/components/booking-flow";
 import { StatCard } from "@/components/ui-cards";
@@ -54,6 +58,13 @@ import type { Permission } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
+/** Async slice so the contact panel can read site_settings without threading
+ *  it through the dashboard's big Promise.all. */
+async function ContactAdminWrapper() {
+  const [contact] = await Promise.all([getSiteContact()]);
+  return <ContactAdmin initial={contact} action={setSiteContactAction} neshanEnabled={neshanApiKey() !== null} />;
+}
+
 const SECTIONS = [
   { id: "live", label: "Live Salon" },
   { id: "notifications", label: "اعلان‌ها" },
@@ -65,7 +76,9 @@ const SECTIONS = [
   { id: "combos", label: "قوانین ترکیب خدمات" },
   { id: "services", label: "سرویس‌ها" },
   { id: "hours", label: "ساعات سالن" },
-  { id: "academy", label: "آکادمی" },
+  { id: "academy", label: "کارگاه‌های حضوری" },
+  { id: "courses", label: "دوره‌های آنلاین" },
+  { id: "contact", label: "آدرس و نقشه" },
   { id: "roles", label: "دسترسی‌ها و نقش‌ها" },
   { id: "audit", label: "لاگ سیستم" },
 ];
@@ -112,6 +125,8 @@ export default async function AdminDashboard({
     if (section.id === "skills") return canApproveSkills;
     if (section.id === "combos" || section.id === "services") return canManageServices;
     if (section.id === "roles" || section.id === "audit") return can("audit:view") || canManageRoles;
+    if (section.id === "courses") return canManageAcademy;
+    if (section.id === "contact") return can("settings:manage");
     return true;
   });
 
@@ -660,6 +675,18 @@ export default async function AdminDashboard({
           </div>
         )}
       </Panel>
+
+      {canManageAcademy && (
+        <Panel id="courses" title="دوره‌های آنلاین — سرفصل، ویدیو، ظرفیت، نتایج" description="ساخت و انتشار دوره‌های ویدیویی؛ ثبت‌نام‌ها، نظرات و نمره‌ها همین‌جا مدیریت می‌شوند.">
+          <CourseAdminPanel />
+        </Panel>
+      )}
+
+      {can("settings:manage") && (
+        <Panel id="contact" title="آدرس سالن و موقعیت در نشان" description="با جست‌وجو در نشان آدرس را انتخاب کنید؛ نتیجه در «آدرس و تماس» سایت، لینک مسیریابی و نقشک پیش‌نمایش نقشه استفاده می‌شود.">
+          <ContactAdminWrapper />
+        </Panel>
+      )}
 
       {canApproveSkills && (
         <Panel id="skills" title="صف تأیید مهارت‌ها" description="مهارت اعلامی آرایشگر تا تأیید مدیریت در زمان‌بندی استفاده نمی‌شود.">

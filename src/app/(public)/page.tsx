@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/session";
 import { QuickAccessPage } from "@/components/home/QuickAccessPage";
 import { demoPhoneHint } from "@/lib/preview";
+import { getSiteContact } from "@/lib/site-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -12,10 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function QuickAccessRoute() {
-  const currentUser = await getCurrentUser();
+  const [currentUser, contact] = await Promise.all([getCurrentUser(), getSiteContact()]);
 
   return (
     <QuickAccessPage
+        contact={contact}
         demoPhoneHint={demoPhoneHint()}
         initialUser={
           currentUser

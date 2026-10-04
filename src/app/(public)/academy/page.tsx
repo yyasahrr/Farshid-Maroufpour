@@ -7,6 +7,8 @@ import { CourseCard, WorkshopCard } from "@/components/course-cards";
 import { Icon } from "@/components/icons";
 import { EmptyState } from "@/components/ui-cards";
 import { getCourseCards, getWorkshopCards } from "@/lib/queries";
+import { getPublishedCourses } from "@/lib/course-queries";
+import { OnlineCourseCard } from "@/components/course-cards";
 import { CONTACT_PHONE_TEL } from "@/lib/site";
 import { todayISO } from "@/lib/time";
 
@@ -14,9 +16,10 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "آکادمی", description: "دوره‌های عملی پیرایش مردانه؛ برنامه، مدرس، ظرفیت و شهریه را پیش از ثبت‌نام ببینید." };
 
 export default async function AcademyPage() {
-  const [courses, workshops, instructors] = await Promise.all([
+  const [courses, workshops, onlineCourses, instructors] = await Promise.all([
     getCourseCards(),
     getWorkshopCards(),
+    getPublishedCourses(),
     db
       .select({ id: barbers.id, slug: barbers.slug, name: barbers.name, title: barbers.title, imageUrl: barbers.imageUrl })
       .from(classes)
@@ -44,22 +47,22 @@ export default async function AcademyPage() {
                 مهارت، با تمرین واقعی آغاز می‌شود.
               </h1>
               <p data-reveal="" className="mt-4 max-w-lg text-[15px] leading-9 text-[#8a6a1e]">
-                دوره‌ها، مدرس‌ها و ظرفیت کلاس‌ها را ببینید و برای برنامه مناسب خود ثبت‌نام کنید. همه
-                برنامه‌ها بر اساس ظرفیت واقعی و مدرس ثبت‌شده نمایش داده می‌شوند.
+                دو مسیر آموزشی داریم: دوره‌های آنلاین با ویدیو، سرفصل و مدرک، و کارگاه‌های حضوری در سالن.
+                ظرفیت و مدرس هر برنامه واقعی و ثبت‌شده است.
               </p>
               <div data-reveal="" className="mt-7 flex flex-wrap gap-3">
-                <Link href="#courses" className="ui-button">
-                  دیدن دوره‌ها<Icon name="arrow" className="h-4 w-4" />
+                <Link href="#online" className="ui-button">
+                  دوره‌های آنلاین<Icon name="arrow" className="h-4 w-4" />
                 </Link>
-                <Link href="#instructors" className="ui-button ui-button-quiet">
-                  مدرسان دوره‌ها
+                <Link href="#inperson" className="ui-button ui-button-quiet">
+                  کارگاه‌های حضوری
                 </Link>
               </div>
             </div>
             <dl className="grid grid-cols-2 gap-3">
               {[
-                { value: courses.length.toLocaleString("fa-IR"), label: "دورهٔ باز" },
-                { value: workshops.length.toLocaleString("fa-IR"), label: "کارگاه حضوری" },
+                { value: onlineCourses.length.toLocaleString("fa-IR"), label: "دوره آنلاین" },
+                { value: (courses.length + workshops.length).toLocaleString("fa-IR"), label: "کارگاه حضوری" },
                 { value: uniqueInstructors.length.toLocaleString("fa-IR"), label: "مدرس فعال" },
                 { value: "عملی", label: "روش آموزش" },
               ].map((item) => (
@@ -72,10 +75,31 @@ export default async function AcademyPage() {
           </div>
         </section>
 
-        <section id="courses" className="scroll-mt-24">
+        <section id="online" className="scroll-mt-24">
           <div className="ui-section-head">
-            <h2>دوره‌های در حال ثبت‌نام</h2>
-            <span className="ui-pill ui-tag-academy">{courses.length.toLocaleString("fa-IR")} دوره</span>
+            <h2>دوره‌های آنلاین</h2>
+            <span className="ui-pill ui-tag-academy">{onlineCourses.length.toLocaleString("fa-IR")} دوره</span>
+          </div>
+          {onlineCourses.length ? (
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {onlineCourses.map((course) => (
+                <div key={course.slug} data-reveal="">
+                  <OnlineCourseCard course={course} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="اولین دوره آنلاین در حال آماده‌سازی است"
+              description="به‌محض انتشار، سرفصل‌ها، تیزر و ظرفیت همین‌جا نمایش داده می‌شود. کارگاه‌های حضوری را از بخش بعد ببینید."
+            />
+          )}
+        </section>
+
+        <section id="inperson" className="mt-16 scroll-mt-24">
+          <div className="ui-section-head">
+            <h2>کارگاه‌های حضوری</h2>
+            <span className="ui-pill ui-tag-academy">{courses.length.toLocaleString("fa-IR")} دوره در حال ثبت‌نام</span>
           </div>
           {courses.length ? (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -94,8 +118,8 @@ export default async function AcademyPage() {
         </section>
 
         {workshops.length > 0 && (
-          <section className="mt-16">
-            <div className="ui-section-head"><h2>کارگاه‌های حضوری</h2></div>
+          <section className="mt-10">
+            <div className="ui-section-head"><h3 className="text-lg font-black">masterclass‌ها و کارگاه‌های فشرده</h3></div>
             <div className="space-y-3">
               {workshops.map((workshop) => (
                 <div key={workshop.slug} data-reveal="">
