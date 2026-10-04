@@ -32,8 +32,9 @@ next-env.d.ts
 .pgdata*/
 *.log
 
-# drizzle migrations output (regenerable via drizzle-kit generate)
-drizzle/
+# NOTE: drizzle/ (migrations + journal) is intentionally TRACKED — committed
+# migration files are the contract between environments; regenerating them per
+# machine would produce diverging names/hashes and break `npm run db:migrate`.
 
 # test artifacts
 artifacts/
