@@ -39,11 +39,6 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
     return heroIntro(node);
   }, []);
 
-  function book() {
-    if (user) router.push("/booking");
-    else setAuthOpen(true);
-  }
-
   return (
     <div ref={root} className="relative isolate flex min-h-[100dvh] flex-col overflow-hidden bg-[#1f2e27] text-white">
       <div className="absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
@@ -111,21 +106,19 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
       </main>
 
       <div className="mx-auto w-full max-w-[730px] space-y-3 px-4 pb-[max(24px,env(safe-area-inset-bottom))] sm:px-8 sm:pb-9">
-        <button
-          type="button"
-          onClick={book}
+        <Link
+          href="/booking"
           data-hero-card=""
           className="focus-ring bento-card-interactive bento-shortcut-booking flex min-h-[118px] w-full items-center justify-between gap-4 rounded-[26px] p-5 text-right sm:p-6"
         >
           <div>
-            <span className="ui-pill bg-[#0b4a30]/65 text-[#d9f2e6]">پیشنهاد اصلی</span>
-            <h2 className="mt-2 text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
-            <p className="mt-1 text-sm leading-6 text-pretty text-[#eaf9f9]">خدمت و زمان مناسب خود را پیدا کنید.</p>
+            <h2 className="text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
+            <p className="mt-1 text-sm leading-6 text-pretty opacity-75">خدمت و زمان مناسب خود را پیدا کنید؛ ورود را مرحلهٔ آخر می‌خواهید.</p>
           </div>
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-white/20">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#d9b364]/18 text-[#e3c990]">
             <Icon name="scissors" className="h-7 w-7" weight="strong" />
           </span>
-        </button>
+        </Link>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {shortcuts.map((item) => (
             <Link

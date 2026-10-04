@@ -602,10 +602,15 @@ img.no-outline {
   transition-duration: var(--duration-fast);
   transition-timing-function: ease-out;
 }
+/* The booking card previews its destination: the dark-premium theme of /booking,
+   brass kept for the moment of focus — not painted over everything. */
 .bento-shortcut-booking {
-  background: #0f5a3b;
-  color: #fff;
-  border: 1px solid #7fc9a6;
+  background: #161a17;
+  color: #f3f1e7;
+  border: 1px solid rgba(217, 179, 100, 0.38);
+}
+.bento-shortcut-booking:hover {
+  border-color: rgba(217, 179, 100, 0.7);
 }
 .bento-shortcut-academy {
   background: #e3f0e9;
