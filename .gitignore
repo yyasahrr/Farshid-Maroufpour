@@ -41,3 +41,7 @@ artifacts/
 playwright-report/
 test-results/
 public/uploads/
+
+# design-review scratch shots (kept outside repo: /home/user/design-review)
+design-*.png
+zoom-*.png
