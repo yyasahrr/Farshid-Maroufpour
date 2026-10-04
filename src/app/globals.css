@@ -604,13 +604,16 @@ img.no-outline {
 }
 /* The booking card previews its destination: the dark-premium theme of /booking,
    brass kept for the moment of focus — not painted over everything. */
+/* Booking is the primary path, so it reads as the site's own action color on
+   the cream landing — green edge + white surface, exactly the ui-card/CTA
+   family used everywhere else. No dark island. */
 .bento-shortcut-booking {
-  background: #161a17;
-  color: #f3f1e7;
-  border: 1px solid rgba(217, 179, 100, 0.38);
+  background: #ffffff;
+  color: #1a2e25;
+  border: 1px solid rgba(15, 90, 59, 0.32);
 }
 .bento-shortcut-booking:hover {
-  border-color: rgba(217, 179, 100, 0.7);
+  border-color: rgba(15, 90, 59, 0.6);
 }
 .bento-shortcut-academy {
   background: #e3f0e9;
@@ -942,84 +945,9 @@ img.no-outline {
    reads the semantic roles; nothing here is invented locally.
    ============================================================ */
 
-/* Customer booking shell — dark premium, gold reserved for
-   selected / active / primary CTA / important state (§33, §34). */
-.theme-customer {
-  --color-bg: #0e100e;
-  --color-surface: #161a17;
-  --color-surface-sunken: #101310;
-  --color-text-primary: #f3f1e7;
-  --color-text-secondary: #c9cfc7;
-  --color-text-muted: #8d968d;
-  --color-action-primary: #d9b364;
-  --color-action-primary-hover: #e8ca8b;
-  --color-accent-soft: rgba(217, 179, 100, 0.14);
-  --color-accent-line: rgba(217, 179, 100, 0.38);
-  --color-brass-text: #e3c990;
-  --color-border: #262b27;
-  --color-border-strong: #3a413b;
-  --color-success: #7fc9a6;
-  --color-warning: #e6c98a;
-  --color-warning-soft: rgba(217, 179, 100, 0.12);
-  --color-danger: #e09aa3;
-  --color-danger-soft: rgba(191, 84, 99, 0.14);
-  --color-booking: #d9b364;
-  color: var(--color-text-primary);
-  background: var(--color-bg);
-}
-.theme-customer .ui-button {
-  background: var(--color-action-primary);
-  color: #191307;
-}
-.theme-customer .ui-button:hover {
-  background: var(--color-action-primary-hover);
-}
-.theme-customer .ui-input,
-.theme-customer .ui-panel,
-.theme-customer .ui-card,
-.theme-customer .bk-row,
-.theme-customer .bk-day,
-.theme-customer .bk-time,
-.theme-customer .bk-sticky,
-.theme-customer .auth-dialog,
-.theme-customer .policy-dialog {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border-color: var(--color-border);
-}
-.theme-customer .ui-input {
-  background: var(--color-surface-sunken);
-}
-.theme-customer :is(.auth-dialog, .policy-dialog) .bg-white {
-  background: var(--color-surface) !important;
-  color: var(--color-text-primary);
-}
-.theme-customer :is(.auth-dialog, .policy-dialog) .bg-\[\#f6f5f1\] {
-  background: var(--color-surface-sunken) !important;
-  color: var(--color-text-secondary);
-}
-.theme-customer .bg-\[\#e2efe8\] {
-  background: var(--color-accent-soft) !important;
-}
-.theme-customer .bg-\[\#f6f5f1\] {
-  background: var(--color-surface-sunken) !important;
-}
-.theme-customer .bg-\[\#f7f0d8\] {
-  background: var(--color-warning-soft) !important;
-  color: var(--color-warning);
-}
-.theme-customer .text-\[\#2f4a3a\] {
-  color: var(--color-text-secondary);
-}
-.theme-customer .text-\[\#5f7168\] {
-  color: var(--color-text-muted);
-}
-.theme-customer .text-\[\#8a6a1e\] {
-  color: var(--color-brass-text);
-}
-.theme-customer .border-\[\#e2e5df\] {
-  border-color: var(--color-border) !important;
-}
+/* Customer booking runs on the SAME light tokens as every public surface
+   (:root swap) — the wizard, dialogs and cards read --color-* roles, so one
+   theme governs landing → booking → pay. No scoped dark override here. */
 
 /* Operations shell (admin / staff) — dark operational UI. */
 .theme-ops {

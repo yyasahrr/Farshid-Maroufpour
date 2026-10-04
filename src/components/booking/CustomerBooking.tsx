@@ -4,19 +4,21 @@
  * Customer booking wizard — one selection, ONE start time, one visit.
  *
  * Step model (design/ux/booking-flow.md):
- *   0 services (multi-select toggles) → 1 date & start time → 2 staff plan
- *   (matching + barber filter) → 3 summary/login/policy/hold → 4 confirmation.
- * Every screen asks for exactly one decision. Per-service times no longer
- * exist: the server plans the continuous visit and this component only renders
- * its answer. Prices, staff and availability come from /api/booking/plan and
- * are re-validated again inside the booking transaction.
+ *   0 services (multi-select; a conflicting pick auto-swaps) → 1 barber
+ *   (pick a person, or let the salon arrange) → 2 date & single start time →
+ *   3 review: plan, hold, identity (guest checkout OR code login — the LAST
+ *   step before paying, never a modal in the middle), policy, commit →
+ *   4 confirmation.
+ * Prices, staff and availability come from /api/booking/plan and are
+ * re-validated again inside the booking transaction; a hold keyed by phone
+ * (even before login) covers the whole visit.
  */
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { z } from "zod";
-import { BookingAuthModal, type AuthUser } from "@/components/booking/BookingAuthModal";
+import type { AuthUser } from "@/components/booking/BookingAuthModal";
 import { BookingPolicySheet } from "@/components/booking/BookingPolicySheet";
 import { Icon } from "@/components/icons";
 import { useToast } from "@/components/toast";
@@ -118,6 +120,26 @@ function persianNum(value: number): string {
   return value.toLocaleString("fa-IR");
 }
 
+/** Accept Persian digits, dashes, +98 — always return 09xxxxxxxxx for the API. */
+function localMobile(value: string): string {
+  let phone = value.trim()
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/[\s\-()]/g, "");
+  if (phone.startsWith("+98")) phone = `0${phone.slice(3)}`;
+  else if (phone.startsWith("0098")) phone = `0${phone.slice(4)}`;
+  else if (phone.startsWith("98")) phone = `0${phone.slice(2)}`;
+  else if (phone.startsWith("9") && phone.length === 10) phone = `0${phone}`;
+  return phone;
+}
+
+function latinDigits(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/\D/g, "");
+}
+
 type Companion = { id: string; name: string };
 type AttendeeSelection = Record<string, number[]>;
 
@@ -151,7 +173,7 @@ export function CustomerBooking({
 
   /* ---- wizard state (one decision per screen) ---- */
   const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(
-    initialServiceId ? (initialStartMin !== undefined ? 2 : 1) : 0,
+    initialServiceId ? (initialStartMin !== undefined ? 3 : 1) : 0,
   );
   const [selected, setSelected] = useState<AttendeeSelection>(() =>
     initialServiceId ? { primary: [initialServiceId] } : { primary: [] },
@@ -165,33 +187,88 @@ export function CustomerBooking({
   const [category, setCategory] = useState("همه");
   const [search, setSearch] = useState("");
   const [showFullCalendar, setShowFullCalendar] = useState(false);
+  /** Shown after a conflict auto-swap: which old pick was dropped and why. */
+  const [swapNote, setSwapNote] = useState<string | null>(null);
 
   const [user, setUser] = useState(initialUser);
-  const [authOpen, setAuthOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   const [policyAccepted, setPolicyAccepted] = useState(false);
+
+  /* ---- review-step identity (guest checkout / code login) ---- */
+  const [checkoutTab, setCheckoutTab] = useState<"guest" | "login">("guest");
+  const [guestName, setGuestName] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
+  const [loginPhone, setLoginPhone] = useState("");
+  const [tabError, setTabError] = useState<string | null>(null);
+  const [otpStage, setOtpStage] = useState<"phone" | "code">("phone");
+  const [otpCode, setOtpCode] = useState<string[]>(Array(6).fill(""));
+  const [previewCode, setPreviewCode] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [clock, setClock] = useState(() => Date.now());
+  const otpInputs = useRef<(HTMLInputElement | null)[]>([]);
+  const verifying = useRef(false);
 
   const [grid, setGrid] = useState<{ key: string; value: PlanResponse | null; error: string | null }>({ key: "", value: null, error: null });
   const [staffPlan, setStaffPlan] = useState<{ key: string; value: PlanResponse | null; error: string | null; stale?: boolean }>({ key: "", value: null, error: null });
   const [hold, setHold] = useState<{ plan: VisitPlan; expiry: number; left: number } | null>(null);
+  const [holdError, setHoldError] = useState<{ message: string; nearby: number[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<z.infer<typeof receiptSchema> | null>(null);
   const requestId = useRef(0);
+  const autoHeldKey = useRef("");
 
-  const stageLabels = ["خدمت", "زمان", "آرایشگر", "بازبینی"];
+  const stageLabels = ["خدمت", "آرایشگر", "زمان", "بازبینی"];
+
+  const activeIds = selected[activeAttendee] ?? [];
+  const primaryIds = useMemo(() => selected.primary ?? [], [selected]);
+
+  /* ---- barber-step eligibility (mirror of planner constraints, server stays authority) ---- */
+  const forcedSameBarberPairs = useMemo(
+    () => combinationRules.filter((r) => r.sameBarberRequired && primaryIds.includes(r.a) && primaryIds.includes(r.b)),
+    [combinationRules, primaryIds],
+  );
+  const barberEvaluation = useCallback(
+    (barber: BookingBarberItem) => {
+      const covered = primaryIds.filter((id) => barber.serviceIds.includes(id));
+      const missing = primaryIds.filter((id) => !barber.serviceIds.includes(id));
+      const clusterBlocked = forcedSameBarberPairs.some(
+        (pair) => !barber.serviceIds.includes(pair.a) || !barber.serviceIds.includes(pair.b),
+      );
+      return {
+        covered,
+        missing,
+        eligible: covered.length > 0 && !clusterBlocked,
+        reason: covered.length === 0
+          ? "هیچ‌کدام از خدمات انتخابی شما را انجام نمی‌دهد."
+          : clusterBlocked
+            ? "این خدمات باید حتماً توسط یک آرایشگر انجام شوند و این آرایشگر همهٔ آن‌ها را ندارد."
+            : missing.length > 0
+              ? `${persianNum(covered.length)} خدمت با خودت، ${persianNum(missing.length)} خدمت با همکار — باز هم یک نوبت.`
+              : "همهٔ خدمات انتخابی را انجام می‌دهد.",
+      };
+    },
+    [primaryIds, forcedSameBarberPairs],
+  );
+  /** A barber chosen for an older selection must not haunt the new one — the
+   *  pick only applies while still eligible, derived per render, never via
+   *  an effect that resets state. */
+  const activeBarberId = useMemo(() => {
+    if (barberFilter === null) return null;
+    const barber = barbersList.find((b) => b.id === barberFilter);
+    return barber && barberEvaluation(barber).eligible ? barber.id : null;
+  }, [barberFilter, barbersList, barberEvaluation]);
 
   const attendeesSpec = useMemo(() => {
     const list: { attendeeId: string; serviceIds: number[]; barberId: number | null }[] = [
-      { attendeeId: "primary", serviceIds: selected.primary ?? [], barberId: barberFilter },
+      { attendeeId: "primary", serviceIds: selected.primary ?? [], barberId: activeBarberId },
     ];
     for (const companion of companions) {
       const ids = selected[companion.id] ?? [];
       if (ids.length > 0) list.push({ attendeeId: companion.id, serviceIds: ids, barberId: null });
     }
     return list.filter((a) => a.serviceIds.length > 0);
-  }, [selected, barberFilter, companions]);
+  }, [selected, activeBarberId, companions]);
 
-  const activeIds = selected[activeAttendee] ?? [];
   const totalMinutes = attendeesSpec.reduce((sum, a) => {
     return sum + a.serviceIds.reduce((s, id) => s + (servicesList.find((x) => x.id === id)?.durationMin ?? 0), 0);
   }, 0);
@@ -216,32 +293,41 @@ export function CustomerBooking({
       normalizeQuery(`${item.name} ${item.description}`).includes(normalizeQuery(search)),
   );
 
-  /** Which services conflict with the current toggle set, and why (mirror of server rules). */
-  const conflictsFor = useCallback(
-    (candidateId: number, currentIds: number[]): string | null => {
-      for (const other of currentIds) {
-        if (other === candidateId) continue;
+  /** Which currently-selected services a candidate would knock out (mirror of server rules). */
+  const conflictingSelected = useCallback(
+    (candidateId: number, currentIds: number[]): number[] =>
+      currentIds.filter((other) => {
+        if (other === candidateId) return false;
         const [a, b] = candidateId < other ? [candidateId, other] : [other, candidateId];
         const rule = combinationRules.find((r) => r.a === a && r.b === b);
-        if (rule && !rule.canCombine) {
-          const otherName = servicesList.find((s) => s.id === other)?.name ?? `سرویس ${other}`;
-          return rule.note.trim() ? `با «${otherName}» قابل ترکیب نیست — ${rule.note}` : `با «${otherName}» قابل ترکیب نیست.`;
-        }
+        return Boolean(rule && !rule.canCombine);
+      }),
+    [combinationRules],
+  );
+
+  /** The salon's own note for the first blocking rule between two services. */
+  const conflictReason = useCallback(
+    (candidateId: number, droppedIds: number[]): string => {
+      for (const other of droppedIds) {
+        const [a, b] = candidateId < other ? [candidateId, other] : [other, candidateId];
+        const rule = combinationRules.find((r) => r.a === a && r.b === b);
+        if (rule && !rule.canCombine)
+          return rule.note.trim() ? rule.note.trim() : "این دو خدمت هم‌زمان انجام نمی‌شوند.";
       }
-      return null;
+      return "";
     },
-    [combinationRules, servicesList],
+    [combinationRules],
   );
 
   /** Services no active barber offers at all — disabled WITH a reason, not just grey. */
   const offeredServiceIds = useMemo(() => new Set(barbersList.flatMap((b) => b.serviceIds)), [barbersList]);
 
-  /* ---- data fetching: grid for step 1, full plan for step 2+ ---- */
+  /* ---- data fetching: grid for step 2, full plan for step 3 ---- */
   const gridKey = `grid:${JSON.stringify(attendeesSpec)}:${date}`;
   const planKey = `plan:${JSON.stringify(attendeesSpec)}:${date}:${startMin ?? "none"}`;
 
   useEffect(() => {
-    if (step !== 1 || attendeesSpec.length === 0) return;
+    if (step !== 2 || attendeesSpec.length === 0) return;
     const controller = new AbortController();
     const serial = ++requestId.current;
     void fetch("/api/booking/plan", {
@@ -263,10 +349,10 @@ export function CustomerBooking({
       });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step === 1, gridKey, date]);
+  }, [step === 2, gridKey, date]);
 
   useEffect(() => {
-    if (step !== 2 || startMin === null || attendeesSpec.length === 0) return;
+    if (step !== 3 || startMin === null || attendeesSpec.length === 0) return;
     const controller = new AbortController();
     const serial = ++requestId.current;
     void fetch("/api/booking/plan", {
@@ -296,17 +382,22 @@ export function CustomerBooking({
       });
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step === 2, planKey, date, startMin]);
+  }, [step === 3, planKey, date, startMin]);
 
   const planValue: PlanResponse | null = staffPlan.key === planKey ? staffPlan.value : null;
   const planError = staffPlan.key === planKey ? staffPlan.error : null;
-  const plan = planValue?.plan ?? null;
-  const planLoading = step === 2 && staffPlan.key !== planKey;
+  const planLoading = step === 3 && staffPlan.key !== planKey;
 
   const gridValue: PlanResponse | null = grid.key === gridKey ? grid.value : null;
   const gridError = grid.key === gridKey ? grid.error : null;
-  const gridLoading = step === 1 && grid.key !== gridKey;
+  const gridLoading = step === 2 && grid.key !== gridKey;
   const validStarts = useMemo(() => new Set(gridValue?.validStarts ?? []), [gridValue]);
+  /** The plan the review shows: held (authoritative) or preview from the server. */
+  const reviewPlan: VisitPlan | null = hold?.plan ?? planValue?.plan ?? null;
+  const nearbyStarts = useMemo(() => {
+    const list = holdError?.nearby?.length ? holdError.nearby : planValue?.nearby ?? [];
+    return [...new Set(list)].sort((x, y) => x - y).slice(0, 3);
+  }, [holdError, planValue]);
 
   /* ---- hold timer ---- */
   const holdExpiry = hold?.expiry;
@@ -319,7 +410,6 @@ export function CustomerBooking({
     return () => window.clearInterval(timer);
   }, [step, holdExpiry]);
 
-  /* ---- policy status on load ---- */
   useEffect(() => {
     if (!initialUser) return;
     let cancelled = false;
@@ -332,26 +422,35 @@ export function CustomerBooking({
     return () => { cancelled = true; };
   }, [initialUser]);
 
-  const waitForHold = useCallback(async (): Promise<boolean> => {
+  /* ---- returning customer: OTP cooldown + focus (was in the auth modal) ---- */
+  useEffect(() => {
+    if (otpStage !== "code") return;
+    const focus = window.setTimeout(() => otpInputs.current[0]?.focus(), 40);
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => { window.clearTimeout(focus); window.clearInterval(timer); };
+  }, [otpStage]);
+
+  const waitForHold = useCallback(async (contactPhone?: string): Promise<boolean> => {
     if (attendeesSpec.length === 0 || startMin === null || busy) return false;
     setBusy(true);
     try {
       const response = await fetch("/api/booking/hold", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ date, startMin, attendees: attendeesSpec }),
+        body: JSON.stringify({
+          date,
+          startMin,
+          attendees: attendeesSpec,
+          ...(contactPhone ? { contactPhone } : {}),
+        }),
       });
       const json: unknown = await response.json();
       if (!response.ok) {
         const failure = holdErrorSchema.safeParse(json);
         const message = failure.success ? failure.data.error : "این زمان دیگر آزاد نیست؛ گزینهٔ دیگری انتخاب کنید.";
         // Recovery, never a reset: keep the selection, offer the nearby starts.
-        setStaffPlan((previous) => ({
-          ...previous,
-          error: message,
-          value: previous.value ? { ...previous.value, plan: null, nearby: (failure.success ? failure.data.nearby : undefined) ?? previous.value.nearby, issues: [] } : null,
-        }));
-        setStep(2);
+        setHold(null);
+        setHoldError({ message, nearby: failure.success ? failure.data.nearby ?? [] : [] });
         toast.push(message, "error");
         return false;
       }
@@ -360,11 +459,11 @@ export function CustomerBooking({
         toast.push("نگهداری زمان انجام نشد. دوباره تلاش کنید.", "error");
         return false;
       }
+      setHoldError(null);
       setHold({ plan: result.data.plan, expiry: new Date(result.data.expiresAt).getTime(), left: result.data.holdDurationSec });
-      setStep(3);
       return true;
     } catch {
-      setStaffPlan((previous) => ({ ...previous, error: "نگهداری زمان انجام نشد؛ اتصال برقرار نیست." }));
+      setHoldError({ message: "نگهداری زمان انجام نشد؛ اتصال برقرار نیست.", nearby: [] });
       toast.push("نگهداری زمان انجام نشد. دوباره تلاش کنید.", "error");
       return false;
     } finally {
@@ -373,36 +472,17 @@ export function CustomerBooking({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendeesSpec, startMin, date, busy]);
 
-  async function continueFromPlan() {
-    if (busy || !plan) return;
-    if (!user) {
-      setAuthOpen(true);
-      return;
-    }
-    if (!policyAccepted) {
-      setPolicyOpen(true);
-      return;
-    }
-    await waitForHold();
-  }
+  /* logged-in customers get the hold quietly as soon as the review has a plan */
+  useEffect(() => {
+    if (step !== 3 || !user || startMin === null || busy) return;
+    if (!planValue?.plan || (hold && hold.left > 0)) return;
+    if (autoHeldKey.current === planKey) return;
+    autoHeldKey.current = planKey;
+    void waitForHold();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, user, startMin, planValue?.plan, hold?.left, planKey]);
 
-  async function handleAuthenticated(signedIn: AuthUser) {
-    setUser(signedIn);
-    setAuthOpen(false);
-    try {
-      const response = await fetch("/api/auth/me", { cache: "no-store" });
-      const result: { policyAccepted?: boolean } = await response.json();
-      if (!response.ok) throw new Error("وضعیت قوانین رزرو دریافت نشد. دوباره تلاش کنید.");
-      const accepted = Boolean(result.policyAccepted);
-      setPolicyAccepted(accepted);
-      if (accepted) await waitForHold();
-      else setPolicyOpen(true);
-    } catch (error) {
-      toast.push(error instanceof Error ? error.message : "ادامه رزرو ممکن نشد.", "error");
-    }
-  }
-
-  async function submit() {
+  async function submit(primaryName: string) {
     if (busy || startMin === null || !hold || hold.left < 1) return;
     setBusy(true);
     try {
@@ -414,7 +494,7 @@ export function CustomerBooking({
           startMin,
           attendees: attendeesSpec.map((a) => ({
             attendeeId: a.attendeeId,
-            attendeeName: a.attendeeId === "primary" ? user?.name ?? "مشتری" : companions.find((c) => c.id === a.attendeeId)?.name ?? "همراه",
+            attendeeName: a.attendeeId === "primary" ? primaryName || "مشتری" : companions.find((c) => c.id === a.attendeeId)?.name ?? "همراه",
             serviceIds: a.serviceIds,
             barberId: a.barberId,
           })),
@@ -424,15 +504,8 @@ export function CustomerBooking({
       if (!response.ok) {
         const failure = z.object({ error: z.string().optional(), nearby: z.array(z.number()).optional() }).safeParse(json);
         const message = failure.data?.error ?? "ثبت نوبت انجام نشد؛ زمان‌ها دوباره بررسی می‌شوند.";
-        setStaffPlan((previous) => ({
-          ...previous,
-          error: message,
-          value: previous.value
-            ? { ...previous.value, plan: null, nearby: failure.data?.nearby?.length ? failure.data.nearby : previous.value.nearby }
-            : previous.value,
-        }));
         setHold(null);
-        setStep(2);
+        setHoldError({ message, nearby: failure.data?.nearby ?? [] });
         toast.push(message, "error");
         return;
       }
@@ -454,22 +527,212 @@ export function CustomerBooking({
     }
   }
 
+  /* ---------- review-step identity: guest checkout & code login ---------- */
+
+  async function sendOtp(): Promise<void> {
+    const mobile = localMobile(loginPhone);
+    if (busy || !/^09\d{9}$/.test(mobile)) { setTabError("شمارهٔ موبایل ۱۱ رقمی و با ۰۹ شروع شود."); return; }
+    setBusy(true);
+    setTabError(null);
+    try {
+      const response = await fetch("/api/auth/otp/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone: mobile }),
+      });
+      const result: { error?: string; devCode?: string } = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "ارسال کد انجام نشد. دوباره تلاش کنید.");
+      setLoginPhone(mobile);
+      setOtpCode(Array(6).fill(""));
+      setPreviewCode(result.devCode ?? "");
+      setCooldownUntil(Date.now() + 60_000);
+      setClock(Date.now());
+      setOtpStage("code");
+    } catch (err) {
+      setTabError(err instanceof Error ? err.message : "ارسال کد انجام نشد.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyOtp(value: string): Promise<void> {
+    if (verifying.current || value.length !== 6) return;
+    verifying.current = true;
+    setBusy(true);
+    setTabError(null);
+    try {
+      const response = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ phone: localMobile(loginPhone), code: value }),
+      });
+      const result: { error?: string; isFirstTime?: boolean; user?: AuthUser } = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "کد واردشده صحیح نیست.");
+      if (result.isFirstTime) {
+        // No account behind this number: the guest tab is the one correct path —
+        // never let someone re-register through the login form.
+        setGuestPhone(localMobile(loginPhone));
+        setOtpStage("phone");
+        setCheckoutTab("guest");
+        setTabError("حسابی با این شماره پیدا نشد؛ نامت را در تب «مشتری جدید» وارد کن — همان‌جا خودکار ساخته می‌شود.");
+        return;
+      }
+      if (!result.user) throw new Error("ورود انجام نشد. دوباره تلاش کنید.");
+      setUser(result.user);
+      setOtpStage("phone");
+      setTabError(null);
+      // The session may own a different number than the pre-login hold was keyed
+      // to; drop the old hold so the fresh (session-keyed) one replaces it.
+      setHold(null);
+      let accepted = false;
+      try {
+        const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+        const me: { policyAccepted?: boolean } = await meResponse.json();
+        accepted = Boolean(meResponse.ok && me.policyAccepted);
+        setPolicyAccepted(accepted);
+      } catch {
+        accepted = false;
+      }
+      if (!accepted) { setBusy(false); verifying.current = false; return; } // CTA now opens the sheet
+      // hold the moment the session exists — same phone, same hold (or a fresh one)
+      await waitForHold();
+    } catch (err) {
+      setTabError(err instanceof Error ? err.message : "بررسی کد انجام نشد.");
+      setOtpCode(Array(6).fill(""));
+      otpInputs.current[0]?.focus();
+    } finally {
+      setBusy(false);
+      verifying.current = false;
+    }
+  }
+
+  function writeOtpDigit(index: number, input: string) {
+    const digit = latinDigits(input).slice(-1);
+    const next = [...otpCode];
+    next[index] = digit;
+    setOtpCode(next);
+    setTabError(null);
+    if (digit && index < 5) otpInputs.current[index + 1]?.focus();
+    if (next.every(Boolean)) void verifyOtp(next.join(""));
+  }
+
+  function onOtpKey(index: number, event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && !otpCode[index] && index > 0) otpInputs.current[index - 1]?.focus();
+  }
+
+  function onOtpPaste(event: ClipboardEvent<HTMLInputElement>) {
+    const pasted = latinDigits(event.clipboardData.getData("text")).slice(0, 6);
+    if (!pasted) return;
+    event.preventDefault();
+    const next = Array.from({ length: 6 }, (_, index) => pasted[index] ?? "");
+    setOtpCode(next);
+    otpInputs.current[Math.min(pasted.length, 5)]?.focus();
+    if (pasted.length === 6) void verifyOtp(pasted);
+  }
+
+  /** The single pay click: hold → account (or existing-route) → policy → commit. */
+  async function checkout(): Promise<void> {
+    if (busy || startMin === null) return;
+    if (hold && hold.left < 1) {
+      setHold(null);
+      await waitForHold(user ? undefined : localMobile(guestPhone) || undefined);
+      return;
+    }
+    if (!reviewPlan) {
+      toast.push("زمان انتخابی معتبر نیست؛ یک ساعت دیگر انتخاب کنید.", "error");
+      setStep(2);
+      return;
+    }
+    let activeUser = user;
+    let displayName = user?.name ?? "";
+    if (!activeUser) {
+      if (checkoutTab !== "guest") {
+        setTabError("برای ادامه اول با کد پیامکی وارد شو، یا به تب «مشتری جدید» برو.");
+        return;
+      }
+      const nameClean = guestName.trim();
+      const mobile = localMobile(guestPhone);
+      if (nameClean.length < 2) { setTabError("نام کامل را وارد کن."); return; }
+      if (!/^09\d{9}$/.test(mobile)) { setTabError("شمارهٔ موبایل ۱۱ رقمی و با ۰۹ شروع شود."); return; }
+      setTabError(null);
+      setBusy(true);
+      try {
+        const response = await fetch("/api/auth/guest", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ phone: mobile, name: nameClean }),
+        });
+        const result: { ok?: boolean; existing?: boolean; error?: string; user?: AuthUser } = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error ?? "ساخت حساب کاربری انجام نشد.");
+        if (result.existing) {
+          setLoginPhone(mobile);
+          setCheckoutTab("login");
+          setOtpStage("phone");
+          setTabError("این شماره قبلاً ثبت‌نام کرده است؛ برای حفظ نوبتت با کد پیامکی وارد شو.");
+          return;
+        }
+        if (!result.user) throw new Error("ساخت حساب کاربری انجام نشد.");
+        activeUser = result.user;
+        displayName = result.user.name;
+        setUser(result.user);
+        // guest accounts start unaccepted on the CURRENT policy version
+        setPolicyAccepted(false);
+      } catch (err) {
+        setTabError(err instanceof Error ? err.message : "ساخت حساب کاربری انجام نشد. دوباره تلاش کنید.");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+    if (!hold || hold.left < 1) {
+      const held = await waitForHold(activeUser ? undefined : localMobile(guestPhone) || undefined);
+      if (!held) return;
+    }
+    if (!policyAccepted) {
+      setPolicyOpen(true);
+      return; // sheet's onAccept continues into submit()
+    }
+    await submit(displayName || guestName.trim());
+  }
+
+  async function acceptPolicyAndContinue(): Promise<void> {
+    setPolicyAccepted(true);
+    setPolicyOpen(false);
+    if (!hold || hold.left < 1) {
+      const held = await waitForHold(user ? undefined : localMobile(guestPhone) || undefined);
+      if (!held) return;
+    }
+    await submit(user?.name ?? guestName.trim());
+  }
+
   function toggleServiceSelection(id: number) {
-    setSelected((current) => {
-      const mine = current[activeAttendee] ?? [];
-      if (mine.includes(id))
-        return { ...current, [activeAttendee]: mine.filter((x) => x !== id) };
-      if (mine.length >= 12) {
-        toast.push("حداکثر ۱۲ خدمت برای هر نفر در یک نوبت.", "error");
-        return current;
-      }
-      const conflict = conflictsFor(id, mine);
-      if (conflict) {
-        toast.push(conflict, "error");
-        return current;
-      }
-      return { ...current, [activeAttendee]: [...mine, id] };
-    });
+    setSwapNote(null);
+    const current = selected;
+    const mine = current[activeAttendee] ?? [];
+    if (mine.includes(id)) {
+      setSelected({ ...current, [activeAttendee]: mine.filter((x) => x !== id) });
+      return;
+    }
+    if (mine.length >= 12) {
+      toast.push("حداکثر ۱۲ خدمت برای هر نفر در یک نوبت.", "error");
+      return;
+    }
+    const blockers = conflictingSelected(id, mine);
+    if (blockers.length === 0) {
+      setSelected({ ...current, [activeAttendee]: [...mine, id] });
+      return;
+    }
+    // Auto-swap instead of blocking: the newer intent wins, the dropped
+    // service and the salon's own reason are stated right above the list.
+    // (never side effects inside a state updater — React warns on this)
+    const nameOf = (serviceId: number) => servicesList.find((s) => s.id === serviceId)?.name ?? `سرویس ${serviceId}`;
+    const dropped = blockers.map((x) => `«${nameOf(x)}»`).join(" و ");
+    const reason = conflictReason(id, blockers);
+    const note = `«${nameOf(id)}» انتخاب شد و ${dropped} از انتخاب خارج شد${reason ? ` — ${reason}` : ""}.`;
+    setSwapNote(note);
+    toast.push(note, "warning");
+    const kept = mine.filter((x) => !blockers.includes(x));
+    setSelected({ ...current, [activeAttendee]: [...kept, id] });
   }
 
   function resetAll() {
@@ -480,6 +743,9 @@ export function CustomerBooking({
     setStartMin(null);
     setBarberFilter(null);
     setHold(null);
+    setHoldError(null);
+    setSwapNote(null);
+    setTabError(null);
     setStep(0);
   }
 
@@ -524,6 +790,7 @@ export function CustomerBooking({
             {receipt.amountDueOnline > 0 && <span className="font-bold text-[var(--color-action-primary)]">پرداخت آنلاین: {formatPrice(receipt.amountDueOnline)}</span>}
             {receipt.remainingDue > 0 && <span className={receipt.amountDueOnline > 0 ? "mr-3 text-[var(--color-text-muted)]" : ""}>مانده در سالن: {formatPrice(receipt.remainingDue)}</span>}
           </p>
+          <p className="mt-3 text-xs text-[var(--color-text-muted)]">حساب کاربری تو با همین شمارهٔ موبایل ساخته/به‌روزرسانی شد؛ از «نوبت‌های من» پیگیری کن.</p>
           <Link href="/account" className="ui-button mt-6 w-full">مشاهده نوبت من</Link>
           <button
             type="button"
@@ -552,10 +819,15 @@ export function CustomerBooking({
   }
 
   /* ================= shell ================= */
+  const remaining = Math.max(0, Math.ceil((cooldownUntil - clock) / 1000));
+  const loginMobileValid = /^09\d{9}$/.test(localMobile(loginPhone));
+  const barberLabel = activeBarberId === null
+    ? "هر آرایشگری"
+    : barbersList.find((b) => b.id === activeBarberId)?.name ?? "هر آرایشگری";
+
   return (
     <div className="mx-auto max-w-[720px] px-4 pb-40 pt-5 sm:px-6 sm:pb-32 sm:pt-9">
-      <BookingAuthModal isOpen={authOpen && !user} onClose={() => setAuthOpen(false)} onAuthenticated={(signedIn) => void handleAuthenticated(signedIn)} demoPhoneHint={demoPhoneHint} />
-      <BookingPolicySheet isOpen={policyOpen} onClose={() => setPolicyOpen(false)} onAccept={async () => { setPolicyAccepted(true); setPolicyOpen(false); await waitForHold(); }} version={policyVersion} items={policyItems} />
+      <BookingPolicySheet isOpen={policyOpen} onClose={() => setPolicyOpen(false)} onAccept={() => void acceptPolicyAndContinue()} version={policyVersion} items={policyItems} />
 
       <header className="mb-6 flex items-center justify-between gap-3">
         <button
@@ -643,37 +915,44 @@ export function CustomerBooking({
 
           <p className="mt-3 text-xs leading-6 text-[var(--color-text-muted)]">
             برای خدمات چندتایی نگران ساعت جداگانه نباشید — شما فقط یک ساعت شروع انتخاب می‌کنید و بقیه را سیستم می‌چیند.
+            خدمات متضاد هم خودکار جابه‌جا می‌شوند: انتخاب خدمت جدید، خدمت قبلیِ در تضاد را از لیست بیرون می‌اندازد.
           </p>
+
+          {swapNote && (
+            <p role="status" data-swap-note className="mt-3 flex items-start justify-between gap-2 rounded-[14px] bg-[var(--color-warning-soft)] p-3 text-xs leading-6 text-[var(--color-warning)]">
+              <span>{swapNote}</span>
+              <button type="button" aria-label="بستن پیام جابه‌جایی" onClick={() => setSwapNote(null)} className="focus-ring shrink-0 font-black">×</button>
+            </p>
+          )}
 
           <div className="mt-4 space-y-2">
             {filteredServices.length ? (
               filteredServices.map((item) => {
                 const isOn = activeIds.includes(item.id);
                 const notOffered = !offeredServiceIds.has(item.id);
-                const conflict = notOffered ? "در حال حاضر هیچ آرایشگری این خدمت را ارائه نمی‌دهد." : conflictsFor(item.id, activeIds);
-                const disabled = notOffered || (conflict !== null && !isOn);
+                const wouldDrop = notOffered ? [] : conflictingSelected(item.id, activeIds).filter((x) => x !== item.id);
+                const willSwap = !isOn && wouldDrop.length > 0;
+                const swapName = willSwap ? `با انتخاب این خدمت، ${wouldDrop.map((x) => `«${servicesList.find((s) => s.id === x)?.name ?? ""}»`).join(" و ")} از انتخاب خارج می‌شود.` : "";
                 return (
-                  <div key={item.id} className={`bk-row ${isOn ? "bk-row-on" : ""} ${disabled ? "bk-row-disabled" : ""}`}>
+                  <div key={item.id} className={`bk-row ${isOn ? "bk-row-on" : ""} ${notOffered ? "bk-row-disabled" : ""}`}>
                     <div className="min-w-0 flex-1">
                       <strong className="block text-[15px] font-bold">{item.name}</strong>
                       <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                         {persianNum(item.durationMin)} دقیقه · {formatPrice(item.basePrice)}
                       </p>
-                      {disabled && conflict && (
+                      {notOffered && <p className="mt-1.5 text-xs font-semibold text-[var(--color-warning)]">این خدمت فعلاً توسط آرایشگران سالن ارائه نمی‌شود.</p>}
+                      {willSwap && (
                         <p className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-[var(--color-warning)]">
-                          <Icon name="close" className="h-3 w-3" />
-                          {conflict}
-                          <button type="button" onClick={() => setSelected((current) => ({ ...current, [activeAttendee]: (current[activeAttendee] ?? []).filter((x) => x !== item.id) }))} className="underline">حذف تضاد</button>
+                          <Icon name="scissors" className="h-3 w-3" />
+                          {swapName}
                         </p>
                       )}
-                      {notOffered && <p className="mt-1.5 text-xs font-semibold text-[var(--color-warning)]">این خدمت فعلاً توسط آرایشگران سالن ارائه نمی‌شود.</p>}
                     </div>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={isOn}
-                      aria-disabled={disabled}
-                      disabled={disabled}
+                      disabled={notOffered}
                       aria-label={`انتخاب ${item.name}`}
                       onClick={() => toggleServiceSelection(item.id)}
                       className="bk-switch"
@@ -696,20 +975,87 @@ export function CustomerBooking({
                 <p className="text-sm font-black">{persianNum(selectionCount)} خدمت · {persianNum(totalMinutes)} دقیقه</p>
                 <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">از {formatPrice(totalPriceFrom)}{totalPriceFrom > 0 ? " · قیمت نهایی در سرور" : ""}</p>
               </div>
-              <button type="button" onClick={() => setStep(1)} className="ui-button shrink-0 !min-h-11 !px-6">
-                انتخاب زمان
+              <button type="button" onClick={() => { setSwapNote(null); setStep(1); }} className="ui-button shrink-0 !min-h-11 !px-6">
+                انتخاب آرایشگر
               </button>
             </div>
           )}
         </section>
       )}
 
-      {/* ============ STEP 1 — date & time ============ */}
+      {/* ============ STEP 1 — barber (BEFORE the time, so the grid shows what they actually offer) ============ */}
       {step === 1 && (
+        <section aria-labelledby="barber-title">
+          <div className="ui-pagehead">
+            <h1 id="barber-title">با چه آرایشگری؟</h1>
+            <p>{persianNum(primaryIds.length)} خدمت انتخابی — یک نفر را بردار یا بگذار سالن بهترین چیدمان را بچیند.</p>
+          </div>
+
+          <div role="group" aria-label="انتخاب آرایشگر" className="mt-4 space-y-2">
+            <button
+              type="button"
+              data-barber-card="any"
+              onClick={() => setBarberFilter(null)}
+              aria-pressed={activeBarberId === null}
+              className={`bk-row w-full text-right ${activeBarberId === null ? "bk-row-on" : ""}`}
+            >
+              <div className="min-w-0 flex-1">
+                <strong className="block text-[15px] font-bold">هر آرایشگری — خودکار</strong>
+                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">بهترین زمان ممکن با هر آرایشگری که هر دو خدماتت را پوشش بدهد.</p>
+              </div>
+              {activeBarberId === null && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب سیستم</span>}
+            </button>
+            {barbersList.map((barber) => {
+              const evaluation = barberEvaluation(barber);
+              const isOn = activeBarberId === barber.id;
+              return (
+                <button
+                  key={barber.id}
+                  type="button"
+                  data-barber-card={barber.slug ?? barber.id}
+                  onClick={() => evaluation.eligible && setBarberFilter(barber.id)}
+                  aria-pressed={isOn}
+                  disabled={!evaluation.eligible}
+                  className={`bk-row w-full text-right ${isOn ? "bk-row-on" : ""} ${!evaluation.eligible ? "bk-row-disabled" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <strong className="block text-[15px] font-bold">{barber.name}</strong>
+                    <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{barber.title || "پیرایش مردانه"}</p>
+                    <p className={`mt-1.5 text-xs font-semibold ${evaluation.eligible ? (evaluation.missing.length > 0 ? "text-[var(--color-warning)]" : "text-[var(--color-success)]") : "text-[var(--color-warning)]"}`}>
+                      {evaluation.reason}
+                    </p>
+                  </div>
+                  {isOn && <span className="shrink-0 rounded-pill bg-[var(--color-accent-soft)] px-3 py-1 text-xs font-black text-[var(--color-action-primary)]">انتخاب تو</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="mt-3 text-xs leading-6 text-[var(--color-text-muted)]">
+            حتی اگر خدماتت بین دو آرایشگر تقسیم شود، یک نوبت پشت‌سرهم برای شما چیده می‌شود — ساعت‌های جداگانه وجود ندارد.
+          </p>
+
+          <div className="safe-bottom bk-sticky">
+            <div className="min-w-0">
+              <p className="text-sm font-black">{barberLabel}</p>
+              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">زمان‌های آزاد بعداً بر همین اساس نشان داده می‌شود</p>
+            </div>
+            <button type="button" onClick={() => setStep(2)} className="ui-button shrink-0 !min-h-11 !px-6">انتخاب زمان</button>
+          </div>
+        </section>
+      )}
+
+      {/* ============ STEP 2 — date & single start time ============ */}
+      {step === 2 && (
         <section aria-labelledby="time-title">
           <div className="ui-pagehead">
             <h1 id="time-title">کِی میایید؟</h1>
-            <p>یک ساعت شروع برای کل {persianNum(selectionCount)} خدمت انتخاب کنید.</p>
+            <p>
+              یک ساعت شروع برای کل {persianNum(selectionCount)} خدمت ·{" "}
+              <button type="button" onClick={() => setStep(1)} className="focus-ring font-black text-[var(--color-action-primary)] underline underline-offset-2">
+                {barberLabel}
+              </button>
+            </p>
           </div>
 
           <div className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="انتخاب روز">
@@ -718,7 +1064,7 @@ export function CustomerBooking({
               const dayNum = new Intl.DateTimeFormat("fa-IR", { day: "numeric", month: "numeric", timeZone: "UTC" }).format(new Date(`${item}T00:00:00Z`));
               const selected2 = item === date;
               return (
-                <button key={item} type="button" onClick={() => { setDate(item); setStartMin(null); setStep(1); }} aria-pressed={selected2} className={`focus-ring bk-day ${selected2 ? "bk-day-on" : ""}`}>
+                <button key={item} type="button" onClick={() => { setDate(item); setStartMin(null); }} aria-pressed={selected2} className={`focus-ring bk-day ${selected2 ? "bk-day-on" : ""}`}>
                   <span className="block text-xs opacity-80">{label}</span>
                   <span className="mt-1 block text-base font-black">{dayNum}</span>
                 </button>
@@ -748,194 +1094,260 @@ export function CustomerBooking({
               <TimeGridSkeleton />
             ) : (gridValue?.validStarts.length ?? 0) === 0 ? (
               <div role="status" className="ui-panel text-sm leading-7 text-[var(--color-text-muted)]">
-                برای {formatPersianDate(date)} زمان آزادی که کل این خدمات را پوشش بدهد پیدا نشد. روز دیگری را امتحان کنید یا خدمات را کم کنید.
+                برای {formatPersianDate(date)} {activeBarberId !== null ? `ساعت آزایی برای ${barberLabel} پیدا نشد` : "زمان آزادی که کل این خدمات را پوشش بدهد پیدا نشد"}. روز دیگری را امتحان کنید{activeBarberId !== null ? " یا آرایشگر را عوض کنید" : ""}؛ خدمات را هم می‌توان کم کرد.
               </div>
             ) : (
               <TimeGrid
                 validStarts={validStarts}
                 selected={startMin}
-                onPick={(minute) => { setStartMin(minute); setStep(2); }}
+                onPick={(minute) => {
+                  setStartMin(minute);
+                  setHold(null);
+                  setHoldError(null);
+                  setStep(3);
+                }}
               />
             )}
           </div>
-
-          {startMin !== null && (
-            <div className="safe-bottom bk-sticky">
-              <div className="min-w-0">
-                <p className="text-sm font-black">{formatPersianDate(date)} · {minutesToLabel(startMin)}</p>
-                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{persianNum(selectionCount)} خدمت پشت سر هم از همین ساعت</p>
-              </div>
-              <button type="button" onClick={() => setStep(2)} className="ui-button shrink-0 !min-h-11 !px-6">دیدن آرایشگر</button>
-            </div>
-          )}
         </section>
       )}
 
-      {/* ============ STEP 2 — staff / plan ============ */}
-      {step === 2 && (
-        <section aria-labelledby="staff-title">
-          <div className="ui-pagehead">
-            <h1 id="staff-title">با چه آرایشگری؟</h1>
-            <p>{formatPersianDate(date)} · شروع {startMin !== null ? minutesToLabel(startMin) : "—"} · سیستم کل visits را می‌چیند.</p>
-          </div>
-
-          <div role="group" aria-label="فیلتر آرایشگر" className="hide-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            <button type="button" onClick={() => { setBarberFilter(null); }} aria-pressed={barberFilter === null} className={`focus-ring ui-pill min-h-11 shrink-0 !px-4 text-sm font-bold ${barberFilter === null ? "bg-[var(--color-action-primary)] text-white" : "border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"}`}>
-              همه آرایشگران
-            </button>
-            {barbersList.map((barber) => (
-              <button key={barber.id} type="button" onClick={() => setBarberFilter(barber.id)} aria-pressed={barberFilter === barber.id} className={`focus-ring ui-pill min-h-11 shrink-0 !px-4 text-sm ${barberFilter === barber.id ? "bg-[var(--color-action-primary)] font-bold text-white" : "border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)]"}`}>
-                {barber.name}
-              </button>
-            ))}
-          </div>
-
-          <div aria-live="polite" className="mt-5 min-h-[180px]">
-            {planLoading ? (
-              <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-24 animate-pulse rounded-[20px] bg-[var(--color-surface-sunken)]" />)}</div>
-            ) : planError ? (
-              <div role="alert" className="rounded-[16px] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] p-4 text-sm text-[var(--color-danger)]">
-                {planError}
-                <button type="button" onClick={() => setStaffPlan((p) => ({ ...p, error: null }))} className="focus-ring mr-2 font-bold underline">تلاش دوباره</button>
-              </div>
-            ) : plan ? (
-              <>
-                <div className={`ui-panel ${staffPlan.stale ? "opacity-70" : ""}`}>
-                  <p className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-base font-black">
-                      {minutesToLabel(plan.startMin)}–{minutesToLabel(plan.endMin)}
-                      <span className="mr-2 rounded-pill bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-action-primary)]">یک نوبت · {persianNum(plan.totalMinutes)} دقیقه</span>
-                    </span>
-                    <span className="text-sm font-bold">{formatPrice(plan.totalPrice)}</span>
-                  </p>
-                  <ol className="mt-4 space-y-2">
-                    {plan.segments.map((segment, index) => (
-                      <li key={`${segment.serviceId}-${index}`} className="bk-seg">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold">{segment.serviceName}
-                            {segment.attendeeId !== "primary" && <span className="mr-2 text-xs font-normal text-[var(--color-text-muted)]">برای {companions.find((c) => c.id === segment.attendeeId)?.name ?? "همراه"}</span>}
-                          </p>
-                          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
-                            <Link data-segment-barber={segment.barberSlug} href={`/barbers/${segment.barberSlug}`} className="font-semibold underline-offset-2 hover:underline">{segment.barberName}</Link>
-                            {" · "}
-                            <span dir="ltr" className="font-mono">{minutesToLabel(segment.startMin)}–{minutesToLabel(segment.clientEndMin)}</span>
-                            {segment.processingMin > 0 && <span> · {persianNum(segment.processingMin)} دقیقه پردازش</span>}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-sm font-bold tabular-nums">{formatPrice(segment.price)}</span>
-                      </li>
-                    ))}
-                  </ol>
-                  {plan.distinctBarbers > 1 && (
-                    <p className="mt-3 rounded-[14px] bg-[var(--color-surface-sunken)] p-3 text-xs leading-6 text-[var(--color-text-muted)]">
-                      این خدمات بین {persianNum(plan.distinctBarbers)} آرایشگر تقسیم شده است؛ شما یک نوبت دارید، نه چند نوبت.
-                    </p>
-                  )}
-                  {plan.requiresManagerApproval && (
-                    <p className="mt-3 text-xs font-semibold text-[var(--color-warning)]">این نوبت پس از ثبت نیازمند تأیید مدیر سالن است.</p>
-                  )}
-                </div>
-
-              </>
-            ) : (
-              <div className="ui-panel">
-                <p className="text-sm leading-7 text-[var(--color-text-muted)]">
-                  {planValue?.issues?.[0]?.message ??
-                    (barberFilter
-                      ? `${barbersList.find((b) => b.id === barberFilter)?.name ?? "این آرایشگر"} در ساعت ${startMin !== null ? minutesToLabel(startMin) : "—"} برای کل این خدمات آزاد نیست.`
-                      : `ساعت ${startMin !== null ? minutesToLabel(startMin) : "—"} برای کل این خدمات پر شده است.`)}
-                </p>
-                {(planValue?.nearby.length ?? 0) > 0 && (
-                  <>
-                    <p className="mt-3 text-xs font-bold text-[var(--color-text-secondary)]">نزدیک‌ترین زمان‌های آزاد:</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {planValue?.nearby.map((minute) => (
-                        <button key={minute} type="button" onClick={() => setStartMin(minute)} className="focus-ring min-h-11 rounded-xl bg-[var(--color-accent-soft)] px-4 text-sm font-bold text-[var(--color-action-primary)]">
-                          {minutesToLabel(minute)}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                <button type="button" onClick={() => { setBarberFilter(null); }} className="focus-ring mt-4 min-h-11 text-sm font-bold text-[var(--color-action-primary)] underline">
-                  لغو فیلتر آرایشگر و دیدن همه گزینه‌ها
-                </button>
-              </div>
-            )}
-          </div>
-
-          {!user && (
-            <p className="mt-4 rounded-[16px] bg-[var(--color-accent-soft)] p-4 text-sm leading-7 text-[var(--color-text-secondary)]">
-              بعد از این مرحله با شماره موبایل وارد شوید؛ زمان برای شما نگه داشته می‌شود و رزرو را یکجا بررسی می‌کنید.
-            </p>
-          )}
-
-          <div className="safe-bottom bk-sticky">
-            <div className="min-w-0">
-              <p className="text-sm font-black">{plan ? `${persianNum(plan.segments.length)} خدمت · ${formatPrice(plan.totalPrice)}` : "—"}</p>
-              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{plan ? "ورود، قوانین و پرداخت در مرحله بعد" : "برای ادامه، یک زمان دیگر انتخاب کنید"}</p>
-            </div>
-            <button type="button" onClick={() => void continueFromPlan()} disabled={!plan || busy || planLoading} className="ui-button shrink-0 !min-h-11 !px-6">
-              {busy ? "در حال بررسی…" : user ? "ادامه و رزرو" : "ورود / ساخت حساب و ادامه"}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* ============ STEP 3 — summary / hold / commit ============ */}
-      {step === 3 && hold && (
+      {/* ============ STEP 3 — review, identity & commit ============ */}
+      {step === 3 && (
         <section aria-labelledby="summary-title">
           <div className="ui-pagehead">
             <h1 id="summary-title">بازبینی و ثبت</h1>
-            <p>همه‌چیز همین است؛ بعد از ثبت، رسید و کد پیگیری می‌گیرید.</p>
+            <p>آخرین نگاه؛ مجموع هزینه پایین همین صفحه است. ورود یا ساخت حساب هم فقط همین‌جا پرسیده می‌شود.</p>
           </div>
 
-          {user && (
+          {user ? (
             <div className="mb-4 flex items-center justify-between gap-3 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm">
               <p>رزرو برای <strong>{user.name}</strong> <span dir="ltr" className="font-semibold text-[var(--color-text-muted)]">{user.phone}</span></p>
-              <button type="button" onClick={() => setStep(2)} className="focus-ring min-h-11 shrink-0 text-xs font-bold text-[var(--color-action-primary)]">تغییر</button>
+              <button type="button" onClick={() => setStep(2)} className="focus-ring min-h-11 shrink-0 text-xs font-bold text-[var(--color-action-primary)]">تغییر زمان</button>
+            </div>
+          ) : (
+            <div className="mb-4 rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+              <div role="tablist" data-checkout-tabs aria-label="نوع حساب کاربری" className="flex gap-2">
+                <button
+                  type="button"
+                  role="tab"
+                  data-checkout-tab="guest"
+                  aria-selected={checkoutTab === "guest"}
+                  onClick={() => { setCheckoutTab("guest"); setTabError(null); }}
+                  className={`focus-ring ui-pill min-h-11 flex-1 !px-3 text-sm font-bold ${checkoutTab === "guest" ? "bg-[var(--color-action-primary)] text-white" : "border border-[var(--color-border)] text-[var(--color-text-secondary)]"}`}
+                >
+                  مشتری جدید
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  data-checkout-tab="login"
+                  aria-selected={checkoutTab === "login"}
+                  onClick={() => { setCheckoutTab("login"); setTabError(null); }}
+                  className={`focus-ring ui-pill min-h-11 flex-1 !px-3 text-sm font-bold ${checkoutTab === "login" ? "bg-[var(--color-action-primary)] text-white" : "border border-[var(--color-border)] text-[var(--color-text-secondary)]"}`}
+                >
+                  قبلاً ثبت‌نام کرده‌ام
+                </button>
+              </div>
+
+              {checkoutTab === "guest" ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs leading-6 text-[var(--color-text-muted)]">
+                    فقط نام و شماره؛ با زدن «ثبت رزرو و پرداخت» حساب شما خودکار ساخته می‌شود و نوبت در «نوبت‌های من» پیگیری خواهد بود — بدون کد پیامکی برای بار اول.
+                  </p>
+                  <div>
+                    <label className="ui-label" htmlFor="guest-name">نام کامل</label>
+                    <input id="guest-name" value={guestName} onChange={(e) => { setGuestName(e.target.value); setTabError(null); }} autoComplete="name" placeholder="مثلاً نیما رستگاری" className="ui-input" />
+                  </div>
+                  <div>
+                    <label className="ui-label" htmlFor="guest-phone">شماره تلفن همراه</label>
+                    <input id="guest-phone" dir="ltr" inputMode="tel" value={guestPhone} onChange={(e) => { setGuestPhone(e.target.value); setTabError(null); }} autoComplete="tel" placeholder="0912 345 6789" className="ui-input text-left" />
+                  </div>
+                </div>
+              ) : otpStage === "phone" ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-xs leading-6 text-[var(--color-text-muted)]">
+                    شماره‌ای که قبلاً با آن ثبت‌نام کرده‌ای را وارد کن؛ کد پیامکی می‌آید و بعد از کد، مستقیم همین صفحه پرداخت می‌شود.
+                  </p>
+                  <div>
+                    <label className="ui-label" htmlFor="login-phone">شماره تلفن همراه</label>
+                    <input id="login-phone" dir="ltr" inputMode="tel" value={loginPhone} onChange={(e) => { setLoginPhone(e.target.value); setTabError(null); }} autoComplete="tel" placeholder="0912 345 6789" className="ui-input text-left" />
+                    {demoPhoneHint && <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">دمو: {demoPhoneHint}</p>}
+                  </div>
+                  <button type="button" onClick={() => void sendOtp()} disabled={!loginMobileValid || busy} className="ui-button w-full !min-h-11">
+                    دریافت کد ورود
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm leading-6">
+                    کد ۶ رقمی برای <strong dir="ltr">{localMobile(loginPhone)}</strong> پیامک شد.
+                    {previewCode && <button type="button" onClick={() => { const fill = previewCode.slice(0, 6).split(""); setOtpCode(fill.concat(Array(6 - fill.length).fill("")).slice(0, 6)); if (fill.length === 6) void verifyOtp(fill.join("")); }} className="focus-ring mr-2 rounded-pill bg-[var(--color-accent-soft)] px-2 text-xs font-bold text-[var(--color-action-primary)]">کد دمو: {previewCode}</button>}
+                  </p>
+                  <div dir="ltr" role="group" aria-label="شش رقم کد تأیید" className="flex justify-center gap-2">
+                    {otpCode.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => { otpInputs.current[index] = el; }}
+                        value={digit}
+                        onChange={(e) => writeOtpDigit(index, e.target.value)}
+                        onKeyDown={(e) => onOtpKey(index, e)}
+                        onPaste={onOtpPaste}
+                        inputMode="numeric"
+                        maxLength={2}
+                        aria-label={`رقم ${persianNum(index + 1)} کد`}
+                        className="focus-ring h-12 w-10 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-sunken)] text-center text-lg font-black tabular-nums"
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void sendOtp()}
+                      disabled={remaining > 0 || busy}
+                      className="focus-ring min-h-11 text-xs font-bold text-[var(--color-action-primary)] disabled:text-[var(--color-text-muted)]"
+                    >
+                      {remaining > 0 ? `ارسال دوباره تا ${persianNum(remaining)} ثانیه` : "ارسال دوبارهٔ کد"}
+                    </button>
+                    <button type="button" onClick={() => { setOtpStage("phone"); setTabError(null); }} className="focus-ring min-h-11 text-xs font-bold text-[var(--color-text-muted)] underline">
+                      شماره را عوض می‌کنم
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {tabError && <p role="alert" data-tab-error className="mt-3 text-xs font-bold leading-6 text-[var(--color-danger)]">{tabError}</p>}
             </div>
           )}
 
-          <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[16px] border p-4 text-sm font-semibold ${hold.left > 0 ? "border-[var(--color-accent-line)] bg-[var(--color-accent-soft)] text-[var(--color-action-primary)]" : "border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] text-[var(--color-danger)]"}`}>
-            <span>{hold.left > 0 ? "این زمان موقتاً برای کل نوبت شما نگه داشته شده است." : "مهلت نگه‌داشتن تمام شد؛ زمان دوباره بررسی می‌شود."}</span>
-            <span dir="ltr" className="font-mono text-lg tabular-nums">
-              {String(Math.floor(hold.left / 60)).padStart(2, "0")}:{String(hold.left % 60).padStart(2, "0")}
-            </span>
-          </div>
+          {hold && (
+            <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[16px] border p-4 text-sm font-semibold ${hold.left > 0 ? "border-[var(--color-accent-line)] bg-[var(--color-accent-soft)] text-[var(--color-action-primary)]" : "border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] text-[var(--color-danger)]"}`}>
+              <span>{hold.left > 0 ? "این زمان موقتاً برای کل نوبت شما نگه داشته شده است." : "مهلت نگه‌داشتن تمام شد؛ با همان اطلاعات، زمان دوباره گرفته می‌شود."}</span>
+              <span dir="ltr" className="font-mono text-lg tabular-nums">
+                {String(Math.floor(hold.left / 60)).padStart(2, "0")}:{String(hold.left % 60).padStart(2, "0")}
+              </span>
+            </div>
+          )}
+          {!hold && !user && reviewPlan && (
+            <p className="mb-4 rounded-[16px] bg-[var(--color-accent-soft)] p-4 text-sm leading-7 text-[var(--color-text-secondary)]">
+              زمان انتخابی هنوز برای کسی رزرو نشده؛ با زدن دکمهٔ پایین، اول همین ساعت برای کل نوبت نگه داشته و بعد ثبت می‌شود.
+            </p>
+          )}
 
-          <div className="ui-panel space-y-3 text-sm">
-            <VisitSummaryRow label="تاریخ" value={formatPersianDate(hold.plan.date)} />
-            <VisitSummaryRow label="زمان نوبت" value={`${minutesToLabel(hold.plan.startMin)}–${minutesToLabel(hold.plan.endMin)}`} strong />
-            <VisitSummaryRow label="مدت کل" value={`${persianNum(hold.plan.totalMinutes)} دقیقه`} />
-            <div className="border-t border-[var(--color-border)] pt-3">
-              <ol className="space-y-2">
-                {hold.plan.segments.map((segment, index) => (
-                  <li key={index} className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-bold">{segment.serviceName}</p>
-                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">{segment.barberName} · <span dir="ltr" className="font-mono">{minutesToLabel(segment.startMin)}–{minutesToLabel(segment.clientEndMin)}</span></p>
+          {holdError && (
+            <div role="alert" className="mb-4 rounded-[16px] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] p-4 text-sm leading-7 text-[var(--color-danger)]">
+              {holdError.message}
+              {nearbyStarts.length > 0 && (
+                <>
+                  <p className="mt-2 text-xs font-bold text-[var(--color-text-secondary)]">نزدیک‌ترین زمان‌های آزاد:</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {nearbyStarts.map((minute) => (
+                      <button key={minute} type="button" onClick={() => { setStartMin(minute); setHold(null); setHoldError(null); }} className="focus-ring min-h-11 rounded-xl bg-[var(--color-accent-soft)] px-4 text-sm font-bold text-[var(--color-action-primary)]">
+                        {minutesToLabel(minute)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {planLoading ? (
+            <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-24 animate-pulse rounded-[20px] bg-[var(--color-surface-sunken)]" />)}</div>
+          ) : !reviewPlan ? (
+            <div className="ui-panel">
+              <p className="text-sm leading-7 text-[var(--color-text-muted)]">
+                {planError ?? planValue?.issues?.[0]?.message ??
+                  (activeBarberId !== null
+                    ? `${barberLabel} در این ساعت برای کل این خدمات آزاد نیست.`
+                    : "این ساعت پر شده است.")}
+              </p>
+              {nearbyStarts.length > 0 && (
+                <>
+                  <p className="mt-3 text-xs font-bold text-[var(--color-text-secondary)]">نزدیک‌ترین زمان‌های آزاد:</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {nearbyStarts.map((minute) => (
+                      <button key={minute} type="button" onClick={() => { setStartMin(minute); setHold(null); setHoldError(null); }} className="focus-ring min-h-11 rounded-xl bg-[var(--color-accent-soft)] px-4 text-sm font-bold text-[var(--color-action-primary)]">
+                        {minutesToLabel(minute)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button type="button" onClick={() => setStep(2)} className="focus-ring mt-4 min-h-11 text-sm font-bold text-[var(--color-action-primary)] underline">
+                انتخاب زمان دیگر
+              </button>
+            </div>
+          ) : (
+            <div className={`ui-panel ${staffPlan.stale ? "opacity-70" : ""}`}>
+              <p className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-base font-black">
+                  {formatPersianDate(reviewPlan.date)} · {minutesToLabel(reviewPlan.startMin)}–{minutesToLabel(reviewPlan.endMin)}
+                  <span className="mr-2 rounded-pill bg-[var(--color-accent-soft)] px-2 py-0.5 text-xs font-bold text-[var(--color-action-primary)]">یک نوبت · {persianNum(reviewPlan.totalMinutes)} دقیقه</span>
+                </span>
+                <button type="button" onClick={() => setStep(2)} className="focus-ring text-xs font-bold text-[var(--color-action-primary)] underline">ویرایش</button>
+              </p>
+              <ol className="mt-4 space-y-2">
+                {reviewPlan.segments.map((segment, index) => (
+                  <li key={`${segment.serviceId}-${index}`} className="bk-seg">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold">{segment.serviceName}
+                        {segment.attendeeId !== "primary" && <span className="mr-2 text-xs font-normal text-[var(--color-text-muted)]">برای {companions.find((c) => c.id === segment.attendeeId)?.name ?? "همراه"}</span>}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                        <Link data-segment-barber={segment.barberSlug} href={`/barbers/${segment.barberSlug}`} className="font-semibold underline-offset-2 hover:underline">{segment.barberName}</Link>
+                        {" · "}
+                        <span dir="ltr" className="font-mono">{minutesToLabel(segment.startMin)}–{minutesToLabel(segment.clientEndMin)}</span>
+                        {segment.processingMin > 0 && <span> · {persianNum(segment.processingMin)} دقیقه پردازش</span>}
+                      </p>
                     </div>
-                    <span className="shrink-0 tabular-nums">{formatPrice(segment.price)}</span>
+                    <span className="shrink-0 text-sm font-bold tabular-nums">{formatPrice(segment.price)}</span>
                   </li>
                 ))}
               </ol>
+              {reviewPlan.distinctBarbers > 1 && (
+                <p className="mt-3 rounded-[14px] bg-[var(--color-surface-sunken)] p-3 text-xs leading-6 text-[var(--color-text-muted)]">
+                  این خدمات بین {persianNum(reviewPlan.distinctBarbers)} آرایشگر تقسیم شده است؛ شما یک نوبت دارید، نه چند نوبت.
+                </p>
+              )}
+              {reviewPlan.requiresManagerApproval && (
+                <p className="mt-3 text-xs font-semibold text-[var(--color-warning)]">این نوبت پس از ثبت نیازمند تأیید مدیر سالن است.</p>
+              )}
+              <div className="mt-4 space-y-2 border-t border-[var(--color-border)] pt-3 text-sm">
+                <VisitSummaryRow label="مبلغ خدمات" value={formatPrice(reviewPlan.totalPrice)} />
+                {reviewPlan.amountDueOnline > 0 && <VisitSummaryRow label={reviewPlan.segments.some((s) => s.paymentMode === "FULL_PAYMENT") ? "پرداخت آنلاین" : "بیعانه آنلاین"} value={formatPrice(reviewPlan.amountDueOnline)} />}
+                <VisitSummaryRow label="مانده در سالن" value={formatPrice(reviewPlan.remainingDue)} />
+              </div>
             </div>
-            <VisitSummaryRow label="مبلغ خدمات" value={formatPrice(hold.plan.totalPrice)} />
-            {hold.plan.amountDueOnline > 0 && <VisitSummaryRow label={hold.plan.segments.some((s) => s.paymentMode === "FULL_PAYMENT") ? "پرداخت آنلاین" : "بیعانه آنلاین"} value={formatPrice(hold.plan.amountDueOnline)} />}
-            <VisitSummaryRow label="مانده در سالن" value={formatPrice(hold.plan.remainingDue)} />
-          </div>
+          )}
 
           <p className="mt-4 text-xs leading-6 text-[var(--color-text-muted)]">
             مبلغ نهایی و آزاد بودن زمان در سرور دوباره بررسی می‌شود؛ نوبت دارای بیعانه پس از تأیید پرداخت قطعی خواهد شد.
+            پیش از ثبت، «نکات مهم رزرو» را یک‌بار می‌پذیری و در حساب ثبت می‌شود.
           </p>
 
           <div className="safe-bottom bk-sticky">
-            <button type="button" onClick={() => { setHold(null); setStaffPlan((p) => ({ ...p, error: null })); void (async () => { if (user && policyAccepted) await waitForHold(); else setStep(2); })(); }} className="focus-ring ui-button ui-button-quiet shrink-0 !min-h-11">
-              بررسی دوباره زمان
-            </button>
-            <button type="button" onClick={() => void submit()} disabled={busy || hold.left < 1} className="ui-button !min-h-11 flex-1">
-              {busy ? "در حال ثبت…" : hold.left < 1 ? "مهلت تمام شد — زمان را دوباره بگیرید" : hold.plan.amountDueOnline > 0 ? "ثبت و پرداخت" : "تأیید و ثبت نوبت"}
+            <div className="min-w-0">
+              <p className="text-sm font-black">مجموع: {reviewPlan ? formatPrice(reviewPlan.totalPrice) : "—"}</p>
+              <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                {reviewPlan && reviewPlan.amountDueOnline > 0 ? `پرداخت آنلاین: ${formatPrice(reviewPlan.amountDueOnline)}` : "پرداخت در سالن"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void checkout()}
+              disabled={busy || !reviewPlan}
+              className="ui-button shrink-0 !min-h-11 !px-6"
+            >
+              {busy
+                ? "در حال ثبت…"
+                : hold && hold.left < 1
+                  ? "مهلت تمام شد — نگه‌داشتن دوباره"
+                  : !user && checkoutTab === "login" && otpStage === "phone"
+                    ? "ابتدا با کد وارد شو"
+                    : reviewPlan && reviewPlan.amountDueOnline > 0
+                      ? "ثبت رزرو و پرداخت"
+                      : "تأیید و ثبت نوبت"}
             </button>
           </div>
         </section>

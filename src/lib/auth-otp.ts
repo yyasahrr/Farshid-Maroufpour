@@ -185,6 +185,42 @@ export async function completeOtpOnboarding(phone: string, code: string, name: s
   return { ok: true, isFirstTime: false, user: await otpUserPayload(user.id, user) };
 }
 
+/**
+ * Guest checkout identity: a customer who reached the pay step with a name and
+ * a phone gets an account WITHOUT an OTP round-trip (the code belongs to the
+ * returning-customer path). Never escalates: staff or non-CLIENT accounts are
+ * not touched, an empty profile left by a half-finished onboarding may be
+ * completed. Returns `existing` when the phone already belongs to a named
+ * account — the UI then routes the person to the OTP login instead.
+ */
+export async function startGuestCheckoutSession(
+  phone: string,
+  name: string,
+): Promise<{ ok: boolean; error?: string; existing?: boolean; user?: { id: number; name: string; phone: string; role: string } }> {
+  const normalized = normalizeIranianMobile(phone);
+  if (!normalized) return { ok: false, error: "شماره موبایل معتبر نیست." };
+  const nameClean = name.trim();
+  if (nameClean.length < 2) return { ok: false, error: "نام کامل را وارد کنید." };
+
+  // Staff/ops numbers are protected by role, not by the demo block (customer
+  // demo numbers must keep working): a non-CLIENT row is never claimed here.
+  const [before] = await db.select().from(users).where(eq(users.phone, normalized)).limit(1);
+  if (before) {
+    if (before.role !== "CLIENT")
+      return { ok: false, error: "این شماره حساب غیرمشتری است؛ با پشتیبانی سالن تماس بگیرید." };
+    // Named account already on this phone? The guest path must NOT log anyone
+    // in without the code — route the visitor to the OTP login instead.
+    if (before.name.trim()) return { ok: true, existing: true };
+  }
+
+  const user = await getUserOrCreate(normalized, nameClean);
+  if (!user) return { ok: false, error: "ساخت حساب کاربری انجام نشد. دوباره تلاش کنید." };
+  if (isDemoPhone(normalized) && user.role !== "CLIENT")
+    return { ok: false, error: "برای حساب کارکنان از بخش ورود کارکنان استفاده کنید." };
+  await setSessionCookie(user.id);
+  return { ok: true, user: { id: user.id, name: user.name, phone: user.phone, role: user.role } };
+}
+
 export async function hasAcceptedPolicy(userId: number, version = POLICY_CURRENT_VERSION): Promise<boolean> {
   const [row] = await db.select({ id: bookingPolicyAcceptance.id }).from(bookingPolicyAcceptance)
     .where(and(eq(bookingPolicyAcceptance.userId, userId), eq(bookingPolicyAcceptance.policyVersion, version))).limit(1);

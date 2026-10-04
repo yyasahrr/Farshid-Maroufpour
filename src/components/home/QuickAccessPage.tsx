@@ -113,9 +113,9 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
         >
           <div>
             <h2 className="text-[23px] font-black leading-9 text-balance sm:text-[27px]">رزرو خدمات</h2>
-            <p className="mt-1 text-sm leading-6 text-pretty opacity-75">خدمت و زمان مناسب خود را پیدا کنید؛ ورود را مرحلهٔ آخر می‌خواهید.</p>
+            <p className="mt-1 text-sm leading-6 text-pretty opacity-75">خدمت، آرایشگر و زمان را بردار؛ نام و شماره فقط مرحلهٔ آخر — همان‌جا حساب خودکار ساخته می‌شود.</p>
           </div>
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#d9b364]/18 text-[#e3c990]">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#e3f0e9] text-[#0f5a3b]">
             <Icon name="scissors" className="h-7 w-7" weight="strong" />
           </span>
         </Link>

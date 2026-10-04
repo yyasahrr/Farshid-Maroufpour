@@ -92,7 +92,7 @@ export default async function BookingPage({
     Number.isInteger(minute) && minute >= 0 && minute < 1440 ? minute : undefined;
 
   return (
-    <main className="theme-customer min-h-screen bg-transparent px-4 py-6 text-[#f3f1e7] sm:py-10">
+    <main className="min-h-screen bg-transparent px-4 py-6 sm:py-10">
       <div className="max-w-2xl mx-auto mb-4 flex items-center justify-between text-xs text-[var(--color-text-muted)]">
         <Link href="/home" className="hover:text-[var(--color-action-primary)] flex items-center gap-1 font-semibold">
           <span>←</span>

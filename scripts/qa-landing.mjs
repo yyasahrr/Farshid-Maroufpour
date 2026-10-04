@@ -20,7 +20,7 @@ const card = await page.evaluate(() => {
   return { tag: a.tagName, href: a.getAttribute("href"), bg: cs.backgroundColor, border: cs.borderTopColor, color: cs.color };
 });
 ok("booking card is a real <a> to /booking (no auth gate, works without JS)", card?.tag === "A" && card?.href === "/booking", JSON.stringify(card));
-ok("card carries the dark-premium booking look", card?.bg === "rgb(22, 26, 23)" && (card?.border || "").startsWith("rgba(217, 179, 100"), `bg=${card?.bg} border=${card?.border}`);
+ok("card harmonizes with the light landing (white surface, green edge)", card?.bg === "rgb(255, 255, 255)" && (card?.border || "").startsWith("rgba(15, 90, 59"), `bg=${card?.bg} border=${card?.border}`);
 
 // click-through: lands on the wizard directly (real mouse click)
 await page.click("a.bento-shortcut-booking");

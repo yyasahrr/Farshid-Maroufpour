@@ -123,6 +123,7 @@ try {
     return false;
   };
   ok("colour service toggled", await toggle("رنگ و لایت"));
+  await waitClick(clientPage, 'b => (b.textContent||"").includes("انتخاب آرایشگر")');
   await waitClick(clientPage, 'b => (b.textContent||"").includes("انتخاب زمان")');
   /* pick the first day/time the API offers */
   let booked = false;
@@ -145,31 +146,44 @@ try {
   }
   ok("a valid start for the colour visit was chosen", booked);
   await sleep(1600);
-  await waitClick(clientPage, 'b => (b.textContent||"").includes("ورود / ساخت حساب و ادامه")', "", 40);
-  try {
-    await clientPage.waitForSelector('dialog input[placeholder="0912 345 6789"]', { visible: true });
-  } catch (e) {
-    console.log("[authdbg]", await clientPage.evaluate(() => ({ url: location.href, dialogs: [...document.querySelectorAll("dialog")].map((d) => ({ open: d.open, t: (d.innerText || "").slice(0, 80) })), body: document.body.innerText.slice(0, 300) })));
-    throw e;
-  }
-  await clientPage.type('dialog input[placeholder="0912 345 6789"]', "09129998877");
-  await waitClick(clientPage, 'b => (b.textContent||"").includes("دریافت کد")', "dialog");
-  await clientPage.waitForSelector('dialog [role="group"][aria-label="شش رقم کد تأیید"] input', { visible: true });
-  await clientPage.focus('dialog [role="group"][aria-label="شش رقم کد تأیید"] input');
-  for (const ch of "123456") { await clientPage.keyboard.type(ch); await sleep(70); }
+  /* identity at the LAST step: the review page itself carries the login tab */
+  await clientPage.waitForSelector('[data-checkout-tab="login"]', { visible: true });
+  await clientPage.evaluate(() => document.querySelector('[data-checkout-tab="login"]').click());
+  await clientPage.waitForSelector("#login-phone", { visible: true });
   await clientPage.evaluate(() => {
-    const b = [...document.querySelectorAll("dialog button")].find((x) => /ورود خودکار|تأیید و ادامه/.test(x.textContent || "") && !x.disabled);
-    b?.click();
+    const el = document.querySelector("#login-phone");
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(el, "09129998877");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  /* policy sheet may appear for a session without recorded acceptance */
+  await waitClick(clientPage, 'b => (b.textContent||"").includes("دریافت کد ورود")');
+  await clientPage.waitForSelector('[role="group"][aria-label="شش رقم کد تأیید"] input', { visible: true });
+  /* deterministic: the demo-code chip fills + verifies in one click */
+  const chip = await clientPage.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").includes("کد دمو"));
+    if (!b) return false;
+    b.click();
+    return true;
+  });
+  if (!chip) {
+    await clientPage.focus('[role="group"][aria-label="شش رقم کد تأیید"] input');
+    for (const ch of "123456") { await clientPage.keyboard.type(ch); await sleep(200); }
+  }
+  /* wait until the verify chain (hold) settles before pressing the pay CTA */
+  await clientPage.waitForFunction(
+    () => [...document.querySelectorAll("button")].some((b) => (b.textContent || "").includes("رزرو و پرداخت") || (b.textContent || "").includes("تأیید و ثبت نوبت")),
+    { timeout: 20000 },
+  ).catch(() => {});
+  /* the pay CTA is pressed; the policy sheet (if any) gates ONE commit click */
+  await sleep(1200);
+  /* commit → /pay because amountDueOnline > 0; policy sheet accepted inline, then submit auto-continues */
+  const payClicked = await waitClick(clientPage, 'b => (b.textContent||"").includes("رزرو و پرداخت")', "", 40);
+  ok("commit button (ثبت رزرو و پرداخت) engaged", payClicked);
   await sleep(1500);
   await clientPage.evaluate(() => {
     const d = [...document.querySelectorAll("dialog")].find((x) => x.open && (x.textContent || "").includes("نکات مهم رزرو"));
     if (d) { d.querySelector('input[type="checkbox"]')?.click(); setTimeout(() => [...d.querySelectorAll("button")].find((b) => (b.textContent || "").includes("تأیید و ادامه"))?.click(), 120); }
   });
-  /* commit → /pay because amountDueOnline > 0 */
-  const payClicked = await waitClick(clientPage, 'b => (b.textContent||"").includes("ثبت و پرداخت")', "", 40);
-  ok("commit button (ثبت و پرداخت) engaged", payClicked);
   await clientPage.waitForFunction(() => location.pathname.startsWith("/pay"), { timeout: 40000 });
   ok("wizard redirected to /pay for the online portion", true, clientPage.url().replace(BASE, ""));
   const amountShown = await clientPage.evaluate(() => document.body.innerText.includes("۱٬۲۰۰٬۰۰۰") || /1,200,000/.test(document.body.innerText));

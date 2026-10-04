@@ -14,6 +14,7 @@ import { db } from "@/db";
 import { appointments, bookingHolds } from "@/db/schema";
 import { addDaysISO, isValidISODate, todayISO } from "@/lib/time";
 import { getCurrentUser } from "@/lib/session";
+import { normalizeIranianMobile } from "@/lib/auth-otp";
 import { rateLimit } from "@/lib/rate-limit";
 import { isSameOriginRequest } from "@/lib/same-origin";
 import { loadPlannerData } from "@/lib/visit-planner-data";
@@ -29,6 +30,9 @@ const HoldSchema = z.object({
   date: z.string().refine(isValidISODate, "تاریخ نامعتبر است"),
   startMin: z.number().int().min(0).max(1439),
   attendees: z.array(AttendeeSchema).min(1).max(12),
+  /** Guest checkout: holds are keyed by phone, so an unauthenticated wizard can
+   *  secure the plan with the same phone it will later register with. */
+  contactPhone: z.string().trim().max(20).optional(),
 });
 
 const HOLD_SECONDS = 10 * 60;
@@ -37,23 +41,30 @@ export async function POST(request: Request) {
   // Reject cross-site posts before touching the session or the database.
   if (!isSameOriginRequest(request))
     return NextResponse.json({ error: "درخواست غیرمجاز است." }, { status: 403 });
-  const user = await getCurrentUser();
-  if (!user || !user.name.trim())
-    return NextResponse.json({ error: "ابتدا با شماره موبایل وارد حساب شوید." }, { status: 401 });
 
   const body: unknown = await request.json().catch(() => null);
   const parsed = HoldSchema.safeParse(body);
   if (!parsed.success)
     return NextResponse.json({ error: "اطلاعات زمان نامعتبر است." }, { status: 400 });
 
+  // Login is NOT a precondition of holding time anymore: identity arrives at
+  // the review step. Keyed by phone either way, so a later login/guest account
+  // with the same number inherits the hold untouched.
+  const user = await getCurrentUser();
+  const phone = user?.phone ?? normalizeIranianMobile(parsed.data.contactPhone ?? "");
+  if (!phone)
+    return NextResponse.json(
+      { error: user ? "حساب شما شمارهٔ معتبر ندارد." : "برای نگه‌داشتن زمان، شماره موبایل لازم است." },
+      { status: 401 },
+    );
+
   const today = todayISO();
   const { date, startMin, attendees } = parsed.data;
   if (date < today || date > addDaysISO(today, 60))
     return NextResponse.json({ error: "تاریخ باید در ۶۰ روز آینده باشد." }, { status: 400 });
-  if (!rateLimit(`hold:user:${user.id}`, 12, 60_000))
+  if (!rateLimit(user ? `hold:user:${user.id}` : `hold:phone:${phone}`, 12, 60_000))
     return NextResponse.json({ error: "درخواست‌های بیش از حد؛ یک دقیقه صبر کنید." }, { status: 429 });
 
-  const phone = user.phone;
 
   try {
     // Expire abandoned unauthenticated holds and stale pending rows first.
