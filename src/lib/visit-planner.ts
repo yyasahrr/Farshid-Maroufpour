@@ -423,6 +423,47 @@ function tryStart(request: VisitRequest, data: PlannerData, start: number): Visi
  * offers nearby starts on failure. With null, enumerates every start time on
  * the date that hosts the complete visit — this is the customer's time grid.
  */
+/** Named occupancy reason for the refused window, when blockers agree. */
+function occupancyReason(data: PlannerData, attendees: AttendeeRequest[], start: number): string | null {
+  const kinds: ("class" | "blocked" | "hold" | "booking")[] = [];
+  let classTitle: string | undefined;
+  let sawAny = false;
+  for (const attendee of attendees) {
+    for (const serviceId of attendee.serviceIds) {
+      const candidates = (data.candidates.get(`${attendee.attendeeId}:${serviceId}`) ?? [])
+        .filter((c) => !attendee.barberId || c.barberId === attendee.barberId);
+      if (candidates.length === 0) return null;
+      const span = Math.max(...candidates.map((c) => c.service.barberDurationMin), 30);
+      const end = start + span;
+      let anyBlockerForService = false;
+      for (const c of candidates) {
+        const cls = c.ctx.blocked.find((b) => b.kind === "class" && overlaps(start, end, b.start, b.end));
+        const bl = !cls && c.ctx.blocked.find((b) => overlaps(start, end, b.start, b.end));
+        const busy = cls || bl ? undefined : c.ctx.busy.find((b) => overlaps(start, end, b.start, b.end));
+        if (!cls && !bl && !busy) { anyBlockerForService = false; break; }
+        anyBlockerForService = true;
+        if (cls) { kinds.push("class"); classTitle = classTitle ?? cls.title; }
+        else if (bl) kinds.push("blocked");
+        else kinds.push(busy!.kind ?? "booking");
+      }
+      if (!anyBlockerForService) return null;
+    }
+  }
+  if (kinds.length === 0) return null;
+  const unanimous = kinds.every((k) => k === kinds[0]);
+  if (!unanimous) return null;
+  switch (kinds[0]) {
+    case "class":
+      return classTitle ? `این آرایشگر ساعت درخواستی در کلاس «${classTitle}» است.` : "ساعت درخواستی با کلاس آموزشی آرایشگر تداخل دارد.";
+    case "blocked":
+      return "این آرایشگر در بازهٔ درخواستی مرخصی یا مسدودی تقویمی دارد.";
+    case "hold":
+      return "این زمان روی میز مشتری دیگری در حال بررسی است.";
+    default:
+      return null;
+  }
+}
+
 export function planVisit(request: VisitRequest, data: PlannerData): PlanOutcome {
   const attendees = request.attendees.filter((a) => a.serviceIds.length > 0);
   if (attendees.length === 0) {
@@ -507,7 +548,7 @@ export function planVisit(request: VisitRequest, data: PlannerData): PlanOutcome
         {
           code: "NO_CAPACITY_AT_TIME",
           message: nearby.length
-            ? `این زمان لحظاتی پیش رزرو شد. نزدیک‌ترین زمان‌ها: ${nearby.map(minutesToLabel).join("، ")}`
+            ? `${occupancyReason(data, attendees, request.startMin) ?? "این زمان لحظاتی پیش رزرو شد."} نزدیک‌ترین زمان‌ها: ${nearby.map(minutesToLabel).join("، ")}`
             : `ساعت ${minutesToLabel(request.startMin)} برای کل این ترکیب خدمات ظرفیت ندارد. یک روز دیگر را امتحان کنید.`,
         },
       ],

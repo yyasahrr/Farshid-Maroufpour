@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
+import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import { appointments, barbers, services } from "@/db/schema";
 import { getCurrentUser, isStaff } from "@/lib/session";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(request: Request) {
+  await sweepExpiredPending(db);
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "برای پیگیری، با شماره موبایل وارد شوید." }, { status: 401 });
   const q = new URL(request.url).searchParams.get("q")?.trim();

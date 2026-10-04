@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
+import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import {
   appointments,
   barberSchedule,
@@ -52,6 +53,7 @@ const STATUS_FA: Record<string, string> = {
   COMPLETED: "تکمیل",
   NO_SHOW: "غیبت",
   CANCELLED_BY_CLIENT: "لغو مشتری",
+  CANCELLED_EXPIRED: "لغو خودکار (انقضای پرداخت)",
   CANCELLED_BY_STAFF: "لغو سالن",
 };
 
@@ -64,6 +66,7 @@ export default async function BarberDashboard() {
   const barberId = user.barberId;
   const today = todayISO();
   const [barber] = await db.select().from(barbers).where(eq(barbers.id, barberId)).limit(1);
+  await sweepExpiredPending(db);
   const [todayAppts, week, allServices, myServices, blocks, mySkillRows, allSkillRows] = await Promise.all([
     db
       .select({

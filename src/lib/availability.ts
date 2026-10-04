@@ -136,8 +136,8 @@ export type DayContext = {
   open: boolean;
   startMin: number;
   endMin: number;
-  busy: { start: number; end: number; id: number }[];
-  blocked: { start: number; end: number }[];
+  busy: { start: number; end: number; id: number; kind?: "booking" | "hold" }[];
+  blocked: { start: number; end: number; kind?: "blocked" | "class"; title?: string }[];
 };
 
 export async function getDayContext(
@@ -183,6 +183,7 @@ export async function getDayContext(
     .select({
       startMin: classSessions.startMin,
       endMin: sql<number>`${classSessions.endMin} + ${classSessions.bufferMin}`,
+      title: classes.title,
     })
     .from(classSessions)
     .innerJoin(classes, eq(classes.id, classSessions.classId))
@@ -207,7 +208,7 @@ export async function getDayContext(
     busy: [
       ...appts.filter((a) => !CANCELLED.includes(a.status) &&
         !(a.status === "PENDING" && a.createdAt.getTime() < expiryCutoff))
-        .map((a) => ({ start: a.startMin, end: a.barberEndMin, id: a.id })),
+        .map((a) => ({ start: a.startMin, end: a.barberEndMin, id: a.id, kind: "booking" as const })),
       ...holds.filter((h) => !excludePhone || h.clientPhone !== excludePhone)
         .map((h) => ({
           start: h.startMin,
@@ -215,14 +216,16 @@ export async function getDayContext(
           // to resolving the service duration for this barber.
           end: h.startMin + (h.durationMin > 0 ? h.durationMin : (h.customDuration ?? h.duration) + h.bufferMin),
           id: -h.id,
+          kind: "hold" as const,
         })),
     ],
     blocked: [
       ...blocks.map((b) => ({
         start: b.fullDay ? 0 : b.startMin,
         end: b.fullDay ? 24 * 60 : b.endMin,
+        kind: "blocked" as const,
       })),
-      ...teachSessions.map((s) => ({ start: s.startMin, end: s.endMin })),
+      ...teachSessions.map((s) => ({ start: s.startMin, end: s.endMin, kind: "class" as const, title: s.title })),
     ],
   };
 }

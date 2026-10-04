@@ -327,4 +327,27 @@ test("blocked window (break/meeting) is skipped by the enumeration", () => {
   assert.ok(out.nearby.includes(1020), "17:00 right after the meeting fits");
 });
 
+/* ---------- named reasons for class / vacation windows ---------- */
+test("class window on the pinned barber yields a named reason, not a generic booked message", () => {
+  const ctx = day({ blocked: [{ start: 1020, end: 1155, kind: "class", title: "فید پیشرفته" }] });
+  const data = makeData([
+    { attendee: "primary", serviceId: 1, candidates: [cand(1, haircut, ctx), cand(2, haircut, day())] },
+  ]);
+  const out = planVisit({ date: "2026-10-06", startMin: 1050, attendees: [{ attendeeId: "primary", serviceIds: [1], barberId: 1 }] }, data);
+  assert.equal(out.plan, null);
+  assert.ok(out.issues.some((i) => i.message.includes('کلاس «فید پیشرفته»')), `expected class reason, got ${JSON.stringify(out.issues)}`);
+  assert.ok(out.nearby.length > 0 && out.nearby[0] >= 1155, "nearby must land after the class + buffer");
+});
+
+test("mixed blockers keep the neutral message (no lying about a single cause)", () => {
+  const classCtx = day({ blocked: [{ start: 1020, end: 1155, kind: "class", title: "فید پیشرفته" }] });
+  const busyCtx = day({ busy: [{ start: 1020, end: 1155, id: 5, kind: "booking" }] });
+  const data = makeData([
+    { attendee: "primary", serviceId: 1, candidates: [cand(1, haircut, classCtx), cand(2, haircut, busyCtx)] },
+  ]);
+  const out = planVisit({ date: "2026-10-06", startMin: 1050, attendees: [{ attendeeId: "primary", serviceIds: [1] }] }, data);
+  assert.equal(out.plan, null);
+  assert.ok(out.issues.every((i) => !i.message.includes("کلاس")), "must not claim a class when causes differ");
+});
+
 console.log(`\nvisit-planner: ${passed} tests passed`);

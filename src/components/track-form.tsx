@@ -7,7 +7,7 @@ import { Badge, EmptyState } from "@/components/ui-cards";
 import { formatPersianDate, minutesToLabel } from "@/lib/time";
 
 type Tracked = { id: number; clientName: string; date: string; startMin: number; endMin: number; status: string; barberName: string; barberSlug: string; serviceId: number; serviceName: string };
-const statusMap: Record<string, string> = { PENDING: "در انتظار پرداخت", CONFIRMED: "تأییدشده", CHECKED_IN: "حاضر در سالن", IN_PROGRESS: "در حال انجام", COMPLETED: "تکمیل‌شده", NO_SHOW: "عدم حضور", CANCELLED_BY_CLIENT: "لغوشده", CANCELLED_BY_STAFF: "لغوشده توسط سالن" };
+const statusMap: Record<string, string> = { PENDING: "در انتظار پرداخت", CONFIRMED: "تأییدشده", CHECKED_IN: "حاضر در سالن", IN_PROGRESS: "در حال انجام", COMPLETED: "تکمیل‌شده", NO_SHOW: "عدم حضور", CANCELLED_BY_CLIENT: "لغوشده", CANCELLED_BY_STAFF: "لغوشده توسط سالن", CANCELLED_EXPIRED: "لغوشده (اتمام مهلت پرداخت)" };
 
 export function TrackForm({ initialQuery = "" }: { initialQuery?: string }) {
   const [query, setQuery] = useState(initialQuery);

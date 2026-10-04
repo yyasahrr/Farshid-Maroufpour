@@ -1,0 +1,2 @@
+DROP INDEX "appointments_slot_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "appointments_slot_unique" ON "appointments" USING btree ("barber_id","date","start_min") WHERE status not in ('CANCELLED_BY_CLIENT','CANCELLED_BY_STAFF','CANCELLED_EXPIRED');

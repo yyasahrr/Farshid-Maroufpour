@@ -235,7 +235,7 @@ export const appointments = pgTable(
     index("appointments_booking_group_idx").on(t.bookingGroupId),
     uniqueIndex("appointments_slot_unique")
       .on(t.barberId, t.date, t.startMin)
-      .where(sql`status not in ('CANCELLED_BY_CLIENT','CANCELLED_BY_STAFF')`),
+      .where(sql`status not in ('CANCELLED_BY_CLIENT','CANCELLED_BY_STAFF','CANCELLED_EXPIRED')`),
   ],
 );
 

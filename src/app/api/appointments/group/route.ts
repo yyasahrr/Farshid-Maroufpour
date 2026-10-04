@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
+import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import { appointments, auditLogs, bookingHolds, notifications, payments } from "@/db/schema";
 import { addDaysISO, isValidISODate, todayISO } from "@/lib/time";
 import { hasAcceptedPolicy } from "@/lib/auth-otp";
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await db.transaction(async (tx) => {
+      // Free slots held by long-expired unpaid pendings before we claim them.
+      await sweepExpiredPending(tx);
       // Lock candidate barber/days up front (all offering barbers, not just the
       // eventual assignment) so a concurrent competing plan serializes here.
       const lockRows = await tx.execute(sql`

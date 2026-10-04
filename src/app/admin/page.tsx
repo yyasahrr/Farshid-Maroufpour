@@ -21,6 +21,7 @@ import {
   users,
 } from "@/db/schema";
 import { LiveSalonTimeline, type TimelineBlock, type TimelineRow } from "@/components/admin/live-salon-timeline";
+import { sweepExpiredPending } from "@/lib/appointment-lifecycle";
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
 import { ActionForm, Field } from "@/components/action-form";
 import { BookingFlow } from "@/components/booking-flow";
@@ -88,6 +89,7 @@ const STATUS_FA: Record<string, string> = {
   COMPLETED: "تکمیل",
   NO_SHOW: "غیبت",
   CANCELLED_BY_CLIENT: "لغو مشتری",
+  CANCELLED_EXPIRED: "لغو خودکار (انقضای پرداخت)",
   CANCELLED_BY_STAFF: "لغو سالن",
 };
 
@@ -99,6 +101,7 @@ export default async function AdminDashboard({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!isStaff(user)) redirect("/barber");
+  await sweepExpiredPending(db);
   const can = (permission: Permission) => user.permissions.has(permission);
   const isSuper = user.roles.includes("SUPER_ADMIN");
   const canManageServices = can("services:manage");

@@ -16,7 +16,7 @@ const labels: Record<string, { label: string; tone: "brand" | "success" | "warn"
   PENDING: { label: "در انتظار پرداخت", tone: "warn" }, CONFIRMED: { label: "تأییدشده", tone: "success" },
   CHECKED_IN: { label: "حاضر در سالن", tone: "brand" }, IN_PROGRESS: { label: "در حال انجام", tone: "brand" },
   COMPLETED: { label: "تکمیل‌شده", tone: "neutral" }, NO_SHOW: { label: "عدم حضور", tone: "danger" },
-  CANCELLED_BY_CLIENT: { label: "لغوشده", tone: "danger" }, CANCELLED_BY_STAFF: { label: "لغوشده توسط سالن", tone: "danger" },
+  CANCELLED_BY_CLIENT: { label: "لغوشده", tone: "danger" }, CANCELLED_BY_STAFF: { label: "لغوشده توسط سالن", tone: "danger" }, CANCELLED_EXPIRED: { label: "لغوشده (اتمام مهلت پرداخت)", tone: "danger" },
 };
 
 function AppointmentCard({ row, onCancel, featured = false }: { row: AppointmentData; onCancel?: (row: AppointmentData) => void; featured?: boolean }) {
