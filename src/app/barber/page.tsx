@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   appointments,
@@ -13,8 +13,8 @@ import {
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
 import { ActionForm, Field } from "@/components/action-form";
 import { AvailabilityHeatmap } from "@/components/heatmap";
-import { StatCard } from "@/components/ui-cards";
 import { NotificationList } from "@/components/notifications";
+import { buildVisitGroups, nextHandoff, segmentsFor } from "@/lib/visits";
 import { heatmap } from "@/lib/availability";
 import { getCurrentUser } from "@/lib/session";
 import {
@@ -26,13 +26,20 @@ import {
   updateAppointmentStatusAction,
   updateBarberProfileAction,
 } from "@/lib/actions/salon";
-import { WEEKDAY_LABELS, formatPersianDate, formatPrice, minutesToLabel, todayISO } from "@/lib/time";
+import {
+  WEEKDAY_LABELS,
+  formatPersianDate,
+  formatPrice,
+  minutesToLabel,
+  salonMinuteOfDay,
+  todayISO,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 const SECTIONS = [
+  { id: "today", label: "امروز" },
   { id: "notifications", label: "اعلان‌ها" },
-  { id: "today", label: "نوبت‌های امروز" },
   { id: "schedule", label: "برنامه هفتگی" },
   { id: "slots", label: "اسلات‌ها و مرخصی" },
   { id: "profile", label: "پروفایل عمومی" },
@@ -77,11 +84,61 @@ export default async function BarberDashboard() {
       .where(and(eq(blockedTimes.barberId, barberId), gte(blockedTimes.date, today))),
   ]);
 
+  // A visit is one customer concept, so the barber sees the whole visit — their
+  // own segments plus what happens before/after in another chair.
+  const groupIds = [...new Set(todayAppts.map((row) => row.a.bookingGroupId).filter(Boolean))] as string[];
+  const memberRows = groupIds.length
+    ? await db
+        .select({
+          id: appointments.id,
+          bookingGroupId: appointments.bookingGroupId,
+          date: appointments.date,
+          startMin: appointments.startMin,
+          endMin: appointments.endMin,
+          serviceId: services.id,
+          serviceName: services.name,
+          barberId: barbers.id,
+          barberName: barbers.name,
+          status: appointments.status,
+          clientName: appointments.clientName,
+          clientPhone: appointments.clientPhone,
+          priceSnapshot: appointments.priceSnapshot,
+        })
+        .from(appointments)
+        .innerJoin(services, eq(services.id, appointments.serviceId))
+        .innerJoin(barbers, eq(barbers.id, appointments.barberId))
+        .where(and(eq(appointments.date, today), inArray(appointments.bookingGroupId, groupIds)))
+    : [];
+  const memberIds = new Set(memberRows.map((row) => row.id));
+  const visitRows = [
+    ...memberRows,
+    ...todayAppts
+      .filter((row) => !memberIds.has(row.a.id))
+      .map((row) => ({
+        id: row.a.id,
+        bookingGroupId: row.a.bookingGroupId,
+        date: row.a.date,
+        startMin: row.a.startMin,
+        endMin: row.a.endMin,
+        serviceId: row.a.serviceId,
+        serviceName: row.serviceName,
+        barberId: row.a.barberId,
+        barberName: barber?.name ?? "",
+        status: row.a.status,
+        clientName: row.a.clientName,
+        clientPhone: row.a.clientPhone,
+        priceSnapshot: row.a.priceSnapshot,
+      })),
+  ];
+  const visits = buildVisitGroups(visitRows).filter((visit) =>
+    visit.segments.some((segment) => segment.barberId === barberId),
+  );
+  const mySegments = visitRows.filter((row) => row.barberId === barberId);
+
   const active = todayAppts
     .filter((r) => !r.a.status.startsWith("CANCELLED"))
     .sort((x, y) => x.a.startMin - y.a.startMin);
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-  const nextClient = active.find((r) => r.a.startMin >= nowMin) ?? null;
+  const nowMin = salonMinuteOfDay();
   const firstService = myServices[0]?.serviceId;
   const grid = firstService ? await heatmap(barberId, firstService, 7) : [];
 
@@ -124,89 +181,113 @@ export default async function BarberDashboard() {
         </span>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="نوبت‌های امروز" value={active.length} hint={formatPersianDate(today)} />
-        <StatCard label="درآمد ثبت‌شده امروز" value={formatPrice(dayRevenue)} hint="سرویس‌های تکمیل‌شده" />
-        <StatCard
-          label="تکمیل‌شده"
-          value={active.filter((r) => r.a.status === "COMPLETED").length}
-          hint="تا این لحظه"
-        />
-        <StatCard
-          label="نوبت‌های پیش‌رو"
-          value={active.filter((r) => r.a.startMin >= nowMin).length}
-          hint="باقی‌مانده شیفت"
-        />
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-[#c59b4b]/25 bg-white/70 px-4 py-3 text-sm">
+        <span className="font-black text-bone">
+          {visits.length.toLocaleString("fa-IR")} نوبت امروز
+        </span>
+        <span className="text-xs font-semibold text-bone/60">
+          {mySegments.length.toLocaleString("fa-IR")} خدمت در سبد شما
+        </span>
+        <span className="text-xs font-semibold text-bone/60">
+          {active.filter((r) => r.a.startMin >= nowMin).length.toLocaleString("fa-IR")} نوبت باقی‌مانده شیفت
+        </span>
+        <span className="text-xs font-semibold text-[#0f5a3b]">
+          {formatPrice(dayRevenue)} ثبت‌شده تا این لحظه
+        </span>
       </div>
 
       <Panel id="notifications" title="اعلان‌های پنل آرایشگر">
         <NotificationList items={notificationItems} />
       </Panel>
 
-      <Panel id="today" title={`امروز ${active.length} نوبت کاری دارید`} description={formatPersianDate(today)}>
-        {nextClient ? (
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border-2 border-[#c59b4b]/35 bg-gradient-to-r from-white via-white to-[#fbf8f0] p-5 shadow-sm">
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0f5a3b] animate-ping" />
-                <p className="text-xs font-bold text-[#0f5a3b]">مشتری بعدی شما</p>
-              </div>
-              <p className="mt-1 text-2xl font-black text-[#855e16]">{minutesToLabel(nextClient.a.startMin)}</p>
-              <p className="text-sm font-semibold text-bone">
-                {nextClient.a.clientName} — {nextClient.serviceName}
-              </p>
-            </div>
-            <p dir="ltr" className="font-mono text-sm font-bold text-[#0f5a3b] bg-[#0f5a3b]/10 px-3 py-1.5 rounded-xl border border-[#0f5a3b]/20">
-              {nextClient.a.clientPhone}
-            </p>
-          </div>
-        ) : (
-          <p className="mb-6 text-sm text-bone/50">نوبت پیش‌روی دیگری برای امروز ثبت نشده است.</p>
-        )}
-
-        {active.length === 0 ? (
+      <Panel id="today" title={`امروز، ${visits.length.toLocaleString("fa-IR")} نوبت`} description={formatPersianDate(today)}>
+        {visits.length === 0 ? (
           <p className="text-sm text-bone/50">امروز نوبتی ندارید.</p>
         ) : (
-          <ul className="divide-y divide-[#c59b4b]/15 rounded-2xl border border-[#c59b4b]/20 bg-white/70 p-2">
-            {active.map(({ a, serviceName }) => (
-              <li key={a.id} className="flex flex-wrap items-center gap-4 p-3 text-sm transition hover:bg-white/80 rounded-xl">
-                <span className="w-16 font-mono font-black text-[#0f5a3b] text-base">{minutesToLabel(a.startMin)}</span>
-                <span className="min-w-32 flex-1">
-                  <span className="font-bold text-bone">{a.clientName}</span>
-                  <span className="block font-mono text-xs text-bone/45" dir="ltr">
-                    {a.clientPhone}
-                  </span>
-                </span>
-                <span className="text-xs font-semibold text-[#855e16]">{serviceName}</span>
-                <span className="rounded-full bg-[#0f5a3b]/10 border border-[#0f5a3b]/25 px-3 py-1 text-[11px] font-bold text-[#0f5a3b]">
-                  {STATUS_FA[a.status]}
-                </span>
-                <form action={updateAppointmentStatusAction} className="flex items-center gap-2">
-                  <input type="hidden" name="appointmentId" value={a.id} />
-                  <label className="sr-only" htmlFor={`st-${a.id}`}>
-                    تغییر وضعیت
-                  </label>
-                  <select
-                    id={`st-${a.id}`}
-                    name="status"
-                    defaultValue={a.status}
-                    className="focus-ring rounded-xl border border-[#c59b4b]/30 bg-white px-2.5 py-1.5 text-xs font-semibold"
-                  >
-                    {Array.from(new Set([a.status, ...NEXT_STATUS])).map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_FA[s]}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="submit"
-                    className="focus-ring rounded-full bg-[#0f5a3b] px-3.5 py-1.5 text-[11px] font-bold text-white hover:bg-[#094028]"
-                  >
-                    ثبت وضعیت
-                  </button>
-                </form>
-              </li>
-            ))}
+          <ul className="space-y-3">
+            {visits.map((visit) => {
+              const mine = segmentsFor(visit, barberId);
+              const handoff = nextHandoff(visit, barberId);
+              const firstOwned = mine[0];
+              return (
+                <li
+                  key={visit.key}
+                  className={`rounded-2xl border bg-white/70 p-4 ${
+                    firstOwned?.status === "CHECKED_IN" || firstOwned?.status === "IN_PROGRESS"
+                      ? "border-[#0f5a3b]/40"
+                      : "border-[#c59b4b]/20"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <p className="text-lg font-black tabular-nums text-[#0f5a3b]">
+                      {minutesToLabel(visit.startMin)}
+                      <span className="mx-1.5 text-xs font-bold text-bone/50">تا</span>
+                      {minutesToLabel(visit.endMin)}
+                    </p>
+                    <p className="text-sm font-bold text-bone">{visit.clientName}</p>
+                    <a
+                      href={`tel:${visit.clientPhone}`}
+                      dir="ltr"
+                      className="focus-ring rounded-lg bg-[#0f5a3b]/10 px-2.5 py-1 font-mono text-xs font-bold text-[#0f5a3b]"
+                    >
+                      {visit.clientPhone}
+                    </a>
+                  </div>
+
+                  <div className="mt-3 rounded-xl bg-[#f7f6f1] p-3">
+                    <p className="text-[11px] font-bold text-bone/60">
+                      {visit.segments.length > 1
+                        ? `کل نوبت ${visit.segments.length.toLocaleString("fa-IR")} خدمت · ${visit.barberNames.join(" + ")}`
+                        : "خدمت شما"}
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-sm">
+                      {mine.map((segment) => (
+                        <li key={segment.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="w-[104px] font-bold tabular-nums" dir="ltr">
+                            {minutesToLabel(segment.startMin)}–{minutesToLabel(segment.endMin)}
+                          </span>
+                          <span className="font-semibold text-bone">{segment.serviceName}</span>
+                          <span className="text-[11px] text-bone/50">
+                            {(segment.endMin - segment.startMin).toLocaleString("fa-IR")} دقیقه
+                          </span>
+                          <form action={updateAppointmentStatusAction} className="ms-auto flex items-center gap-2">
+                            <input type="hidden" name="appointmentId" value={segment.id} />
+                            <label className="sr-only" htmlFor={`st-${segment.id}`}>
+                              وضعیت {segment.serviceName}
+                            </label>
+                            <select
+                              id={`st-${segment.id}`}
+                              name="status"
+                              defaultValue={segment.status}
+                              className="focus-ring rounded-lg border border-[#c59b4b]/30 bg-white px-2 py-1 text-[11px] font-semibold"
+                            >
+                              {Array.from(new Set([segment.status, ...NEXT_STATUS])).map((status) => (
+                                <option key={status} value={status}>
+                                  {STATUS_FA[status]}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="submit"
+                              className="focus-ring rounded-lg bg-[#0f5a3b] px-2.5 py-1 text-[11px] font-bold text-white"
+                            >
+                              ثبت وضعیت
+                            </button>
+                          </form>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {handoff && (
+                    <p className="mt-2 text-xs font-semibold text-bone/60">
+                      بعدی: {minutesToLabel(handoff.startMin)}–{minutesToLabel(handoff.endMin)} — {handoff.serviceName} با{" "}
+                      {handoff.barberName}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>

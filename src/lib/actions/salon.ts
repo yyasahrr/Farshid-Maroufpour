@@ -19,7 +19,10 @@ import {
 } from "@/db/schema";
 import { getCurrentUser, isStaff, type SessionUser } from "@/lib/session";
 import { hashPassword } from "@/lib/passwords";
-import { isValidISODate } from "@/lib/time";
+import { isValidISODate, minutesToLabel } from "@/lib/time";
+import { createDbPlannerSource } from "@/lib/visit-planner-db";
+import { validateVisitItems } from "@/lib/visit-planner";
+import { resolveService } from "@/lib/availability";
 
 export type ActionResult = { ok: boolean; message: string };
 
@@ -166,6 +169,96 @@ export async function toggleBarberServiceAction(formData: FormData): Promise<voi
   }
   revalidatePath("/admin");
   revalidatePath("/barber");
+}
+
+const ReassignSchema = z.object({
+  appointmentId: z.coerce.number().int().positive(),
+  barberId: z.coerce.number().int().positive(),
+  time: z
+    .string()
+    .trim()
+    .regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "ساعت باید مانند 14:30 باشد")
+    .optional()
+    .or(z.literal("")),
+});
+
+/**
+ * Moves one segment of a visit to another barber and/or time.
+ *
+ * The whole visit is revalidated through the visit planner before anything is
+ * written — capability, working hours, blocked time, other bookings and
+ * per-customer overlap — so an invalid assignment cannot be created simply
+ * because an admin clicked it.
+ */
+export async function reassignAppointmentAction(
+  _prev: ActionResult | null,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user || !isStaff(user.role)) return fail("دسترسی غیرمجاز.");
+  const parsed = ReassignSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const { appointmentId, barberId } = parsed.data;
+
+  const [target] = await db.select().from(appointments).where(eq(appointments.id, appointmentId)).limit(1);
+  if (!target) return fail("نوبت پیدا نشد.");
+  if (target.status.startsWith("CANCELLED")) return fail("نوبت لغوشده قابل جابه‌جایی نیست.");
+
+  const groupRows = target.bookingGroupId
+    ? await db.select().from(appointments).where(eq(appointments.bookingGroupId, target.bookingGroupId))
+    : [target];
+
+  const startMin = parsed.data.time
+    ? Number(parsed.data.time.split(":")[0]) * 60 + Number(parsed.data.time.split(":")[1])
+    : target.startMin;
+
+  const page = await db.transaction(async (tx) => {
+    const items = groupRows.map((row) => ({
+      attendeeId: row.bookingGroupId ?? `appointment:${row.id}`,
+      barberId: row.id === target.id ? barberId : row.barberId,
+      serviceId: row.serviceId,
+      date: row.date,
+      startMin: row.id === target.id ? startMin : row.startMin,
+    }));
+
+    const source = createDbPlannerSource({
+      serviceIds: items.map((item) => item.serviceId),
+      excludeAppointmentIds: groupRows.map((row) => row.id),
+    });
+    const validation = await validateVisitItems(source, items);
+    if (!validation.ok) return { ok: false as const, error: validation.error };
+
+    const service = await resolveService(barberId, target.serviceId);
+    if (!service) return { ok: false as const, error: "این خدمت برای آرایشگر انتخابی فعال نیست." };
+
+    await tx
+      .update(appointments)
+      .set({
+        barberId,
+        startMin,
+        endMin: startMin + service.durationMin,
+        barberEndMin: startMin + service.barberDurationMin + service.bufferMin,
+      })
+      .where(eq(appointments.id, target.id));
+
+    await tx.insert(auditLogs).values({
+      actor: `user:${user.id}`,
+      action: "APPOINTMENT_REASSIGNED",
+      target: `appointment:${target.id} → barber:${barberId} @ ${minutesToLabel(startMin)}`,
+    });
+    await tx.insert(notifications).values({
+      targetRole: "BARBER",
+      kind: "BOOKING_REASSIGNED",
+      title: "نوبت جابه‌جا شد",
+      body: `${minutesToLabel(startMin)} — کد ${target.id}`,
+    });
+    return { ok: true as const };
+  });
+
+  if (!page.ok) return fail(page.error);
+  revalidatePath("/admin");
+  revalidatePath("/barber");
+  return ok("نوبت با موفقیت جابه‌جا شد.");
 }
 
 export async function setSalonHoursAction(

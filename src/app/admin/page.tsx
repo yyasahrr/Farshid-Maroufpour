@@ -5,6 +5,9 @@ import { db } from "@/db";
 import {
   appointments,
   auditLogs,
+  barberSchedule,
+  barberServices,
+  barberSkills,
   barbers,
   classRegistrations,
   classes,
@@ -14,6 +17,8 @@ import {
 } from "@/db/schema";
 import { DashboardShell, Panel } from "@/components/dashboard-shell";
 import { ActionForm, Field } from "@/components/action-form";
+import { BookingCommandCenter, type CommandCenterVisitRow } from "@/components/admin/BookingCommandCenter";
+import { SkillMatrix } from "@/components/admin/SkillMatrix";
 import { BookingFlow } from "@/components/booking-flow";
 import { StatCard } from "@/components/ui-cards";
 import { NotificationList } from "@/components/notifications";
@@ -26,19 +31,29 @@ import {
   setSalonHoursAction,
   updateAppointmentStatusAction,
 } from "@/lib/actions/salon";
-import { WEEKDAY_LABELS, formatPersianDate, formatPrice, isValidISODate, minutesToLabel, todayISO } from "@/lib/time";
+import {
+  WEEKDAY_LABELS,
+  formatPersianDate,
+  formatPrice,
+  isValidISODate,
+  minutesToLabel,
+  persianWeekday,
+  salonMinuteOfDay,
+  todayISO,
+} from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 const SECTIONS = [
-  { id: "notifications", label: "اعلان‌ها" },
-  { id: "calendar", label: "تقویم روز" },
+  { id: "calendar", label: "مرکز رزرو" },
+  { id: "skills", label: "ماتریس مهارت" },
   { id: "walkin", label: "پذیرش حضوری" },
-  { id: "clients", label: "بانک مشتریان" },
-  { id: "team", label: "مدیریت تیم" },
-  { id: "services", label: "سرویس‌ها" },
+  { id: "clients", label: "مشتریان" },
+  { id: "team", label: "آرایشگران" },
+  { id: "services", label: "خدمات" },
   { id: "hours", label: "ساعات سالن" },
   { id: "academy", label: "آکادمی" },
+  { id: "notifications", label: "اعلان‌ها" },
   { id: "audit", label: "لاگ سیستم" },
 ];
 
@@ -56,7 +71,7 @@ const STATUS_FA: Record<string, string> = {
 export default async function AdminDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; barber?: string }>;
+  searchParams: Promise<{ date?: string; barber?: string; view?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -66,8 +81,9 @@ export default async function AdminDashboard({
   const sp = await searchParams;
   const date = sp.date && isValidISODate(sp.date) ? sp.date : todayISO();
   const barberFilter = Number(sp.barber) > 0 ? Number(sp.barber) : null;
+  const view = sp.view === "list" ? "list" : "day";
 
-  const [dayRows, barberRows, serviceRows, hours, classRows, registrations, logs, clientRows, booking] =
+  const [dayRows, barberRows, serviceRows, hours, classRows, registrations, logs, clientRows, booking, weekSchedules, links, skillLinks] =
     await Promise.all([
       db
         .select({ a: appointments, barberName: barbers.name, serviceName: services.name })
@@ -103,9 +119,41 @@ export default async function AdminDashboard({
         .orderBy(desc(sql`max(${appointments.date})`))
         .limit(8),
       loadBookingData(),
+      db.select().from(barberSchedule),
+      db.select().from(barberServices),
+      db.select().from(barberSkills),
     ]);
 
+  // Which barbers are actually on shift today (salon hours ∩ barber hours).
+  const weekday = persianWeekday(date);
+  const salonDay = hours.find((row) => row.weekday === weekday);
+  const workingBarbers = barberRows.filter((barber) => {
+    if (!salonDay || salonDay.closed) return false;
+    const schedule = weekSchedules.find((row) => row.barberId === barber.id && row.weekday === weekday);
+    if (!schedule || schedule.dayOff) return false;
+    return (
+      Math.min(salonDay.closeMin, schedule.endMin) > Math.max(salonDay.openMin, schedule.startMin)
+    );
+  });
+  const openMinutesPerBarber = salonDay && !salonDay.closed ? Math.max(salonDay.closeMin - salonDay.openMin, 0) : 0;
+
   const sorted = dayRows.sort((x, y) => x.a.startMin - y.a.startMin);
+  const commandRows: CommandCenterVisitRow[] = sorted.map(({ a, barberName, serviceName }) => ({
+    id: a.id,
+    bookingGroupId: a.bookingGroupId,
+    date: a.date,
+    startMin: a.startMin,
+    endMin: a.endMin,
+    serviceId: a.serviceId,
+    serviceName,
+    barberId: a.barberId,
+    barberName,
+    priceSnapshot: a.priceSnapshot,
+    status: a.status,
+    clientName: a.clientName,
+    clientPhone: a.clientPhone,
+  }));
+
   const revenue = sorted
     .filter((r) => r.a.status === "COMPLETED")
     .reduce((sum, r) => sum + r.a.priceSnapshot, 0);
@@ -131,50 +179,30 @@ export default async function AdminDashboard({
 
   return (
     <DashboardShell title="پنل مدیریت سالن" subtitle={`${user.name} · ${isSuper ? "مدیر ارشد" : "پذیرش"}`} sections={SECTIONS}>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="نوبت‌های تقویم امروز" value={sorted.length} hint={formatPersianDate(date)} />
-        <StatCard
-          label="تکمیل‌شده"
-          value={sorted.filter((r) => r.a.status === "COMPLETED").length}
-          hint="سرویس‌های ارائه‌شده"
-        />
-        <StatCard
-          label="درآمد صندوق امروز"
-          value={formatPrice(revenue)}
-          hint="نوبت‌های تسویه‌شده"
-        />
-        <StatCard
-          label="تیم آرایشگران فعال"
-          value={barberRows.filter((b) => b.active).length}
-          hint={`از مجموع ${barberRows.length} پرسنل`}
-        />
-        <StatCard label="ثبت‌نام‌های آکادمی" value={registrations.length} hint="آخرین ورودی‌ها" />
-        <StatCard
-          label="هنرجویان فعال"
-          value={new Set(registrations.map((r) => r.r.studentPhone)).size}
-          hint="شماره‌های یکتا"
-        />
-        <StatCard
-          label="کل غیبت‌های ثبت‌شده"
-          value={clientRows.reduce((sum, c) => sum + Number(c.noShows ?? 0), 0)}
-          hint="شاخص No-Show"
-        />
-        <StatCard
-          label="بانک مشتریان یکتا"
-          value={clientRows.length}
-          hint="بر اساس شماره موبایل"
-        />
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-[#e5e0d4] bg-white px-4 py-3 text-sm">
+        <span className="font-black text-bone">{sorted.length.toLocaleString("fa-IR")} خدمت رزروشده</span>
+        <span className="text-xs font-semibold text-bone/60">
+          {workingBarbers.length.toLocaleString("fa-IR")} آرایشگر شیفت · ظرفیت{" "}
+          {Math.round((workingBarbers.length * openMinutesPerBarber) / 60).toLocaleString("fa-IR")} ساعت
+        </span>
+        <span className="text-xs font-semibold text-[#6b5213]">
+          {sorted.filter((r) => r.a.status === "PENDING").length.toLocaleString("fa-IR")} در انتظار پرداخت
+        </span>
+        <span className="text-xs font-semibold text-[#0f5a3b]">صندوق امروز: {formatPrice(revenue)}</span>
+        <span className="text-xs font-semibold text-bone/60">
+          {registrations.length.toLocaleString("fa-IR")} ثبت‌نام آکادمی
+        </span>
       </div>
 
       <Panel id="notifications" title="اعلان‌های مدیریتی و رزروها">
         <NotificationList items={notificationItems} />
       </Panel>
 
-      <Panel id="calendar" title="تقویم متمرکز روزانه سالن" description={formatPersianDate(date)}>
-        <form className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-[#c59b4b]/20 bg-white/70 p-4" method="get">
+      <Panel id="calendar" title="مرکز فرمان رزرو" description={formatPersianDate(date)}>
+        <form className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-[#e5e0d4] bg-white p-4" method="get">
           <div>
             <label htmlFor="date" className="text-[11px] font-semibold text-bone/70">
-              انتخاب تاریخ
+              تاریخ
             </label>
             <input
               id="date"
@@ -182,7 +210,7 @@ export default async function AdminDashboard({
               type="date"
               dir="ltr"
               defaultValue={date}
-              className="focus-ring mt-1 rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs font-mono"
+              className="focus-ring mt-1 rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 font-mono text-xs"
             />
           </div>
           <div>
@@ -196,84 +224,112 @@ export default async function AdminDashboard({
               className="focus-ring mt-1 rounded-xl border border-[#c59b4b]/30 bg-white px-3 py-2 text-xs"
             >
               <option value="">همه آرایشگران سالن</option>
-              {barberRows.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+              {barberRows.map((barber) => (
+                <option key={barber.id} value={barber.id}>
+                  {barber.name}
                 </option>
               ))}
             </select>
           </div>
-          <button
-            type="submit"
-            className="focus-ring rounded-full bg-[#0f5a3b] px-5 py-2 text-xs font-bold text-white hover:bg-[#094028]"
-          >
-            اعمال فیلتر تقویم
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              name="view"
+              value="day"
+              className="focus-ring rounded-full bg-[#0f5a3b] px-5 py-2 text-xs font-bold text-white hover:bg-[#094028]"
+            >
+              نمای روز
+            </button>
+            <button
+              type="submit"
+              name="view"
+              value="list"
+              className="focus-ring rounded-full border border-[#0f5a3b]/30 bg-white px-5 py-2 text-xs font-bold text-[#0f5a3b]"
+            >
+              نمای لیست خدمات
+            </button>
+          </div>
         </form>
 
-        {sorted.length === 0 ? (
-          <p className="text-sm text-bone/50">برای این تاریخ نوبتی ثبت نشده است.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[#c59b4b]/20 bg-white/70 p-2">
-            <table className="w-full min-w-[640px] text-right text-sm">
-              <thead className="text-xs text-bone/55 border-b border-[#c59b4b]/20">
-                <tr>
-                  <th className="py-2.5 px-3 font-bold">ساعت</th>
-                  <th className="py-2.5 px-3 font-bold">مشتری</th>
-                  <th className="py-2.5 px-3 font-bold">آرایشگر</th>
-                  <th className="py-2.5 px-3 font-bold">سرویس</th>
-                  <th className="py-2.5 px-3 font-bold">وضعیت</th>
-                  <th className="py-2.5 px-3 font-bold">عملیات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#c59b4b]/10">
-                {sorted.map(({ a, barberName, serviceName }) => (
-                  <tr key={a.id} className="hover:bg-white/90">
-                    <td className="py-3 px-3 font-mono font-black text-[#0f5a3b]">{minutesToLabel(a.startMin)}</td>
-                    <td className="py-3 px-3">
-                      <span className="font-bold text-bone">{a.clientName}</span>
-                      <span className="block font-mono text-xs text-bone/45" dir="ltr">
-                        {a.clientPhone}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-semibold text-bone">{barberName}</td>
-                    <td className="py-3 px-3 text-xs text-[#855e16] font-semibold">{serviceName}</td>
-                    <td className="py-3 px-3 text-xs">
-                      <span className="rounded-full bg-[#0f5a3b]/10 border border-[#0f5a3b]/25 px-2.5 py-0.5 text-[11px] font-bold text-[#0f5a3b]">
-                        {STATUS_FA[a.status]}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <form action={updateAppointmentStatusAction} className="flex gap-2">
-                        <input type="hidden" name="appointmentId" value={a.id} />
-                        <label className="sr-only" htmlFor={`adm-st-${a.id}`}>
-                          وضعیت
-                        </label>
-                        <select
-                          id={`adm-st-${a.id}`}
-                          name="status"
-                          defaultValue={a.status}
-                          className="focus-ring rounded-xl border border-[#c59b4b]/30 bg-white px-2 py-1 text-xs"
-                        >
-                          {Object.keys(STATUS_FA).map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_FA[s]}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="submit"
-                          className="focus-ring rounded-full bg-[#0f5a3b] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#094028]"
-                        >
-                          ثبت
-                        </button>
-                      </form>
-                    </td>
+        {view === "list" ? (
+          sorted.length === 0 ? (
+            <p className="text-sm text-bone/50">برای این تاریخ نوبتی ثبت نشده است.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[#e5e0d4] bg-white p-2">
+              <table className="w-full min-w-[720px] text-right text-sm">
+                <thead className="border-b border-[#e5e0d4] text-xs text-bone/55">
+                  <tr>
+                    <th className="px-3 py-2.5 font-bold">ساعت</th>
+                    <th className="px-3 py-2.5 font-bold">مشتری</th>
+                    <th className="px-3 py-2.5 font-bold">آرایشگر</th>
+                    <th className="px-3 py-2.5 font-bold">خدمت</th>
+                    <th className="px-3 py-2.5 font-bold">وضعیت</th>
+                    <th className="px-3 py-2.5 font-bold">عملیات</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#e5e0d4]">
+                  {sorted.map(({ a, barberName, serviceName }) => (
+                    <tr key={a.id}>
+                      <td className="px-3 py-3 font-mono font-black text-[#0f5a3b]">{minutesToLabel(a.startMin)}</td>
+                      <td className="px-3 py-3">
+                        <span className="font-bold text-bone">{a.clientName}</span>
+                        <span className="block font-mono text-xs text-bone/45" dir="ltr">
+                          {a.clientPhone}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-bone">{barberName}</td>
+                      <td className="px-3 py-3 text-xs font-semibold text-[#855e16]">{serviceName}</td>
+                      <td className="px-3 py-3 text-xs">
+                        <span className="rounded-full border border-[#0f5a3b]/25 bg-[#0f5a3b]/10 px-2.5 py-0.5 text-[11px] font-bold text-[#0f5a3b]">
+                          {STATUS_FA[a.status]}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <form action={updateAppointmentStatusAction} className="flex gap-2">
+                          <input type="hidden" name="appointmentId" value={a.id} />
+                          <label className="sr-only" htmlFor={`adm-st-${a.id}`}>
+                            وضعیت
+                          </label>
+                          <select
+                            id={`adm-st-${a.id}`}
+                            name="status"
+                            defaultValue={a.status}
+                            className="focus-ring rounded-xl border border-[#c59b4b]/30 bg-white px-2 py-1 text-xs"
+                          >
+                            {Object.keys(STATUS_FA).map((status) => (
+                              <option key={status} value={status}>
+                                {STATUS_FA[status]}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="submit"
+                            className="focus-ring rounded-full bg-[#0f5a3b] px-3 py-1 text-[11px] font-bold text-white"
+                          >
+                            ثبت
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <BookingCommandCenter
+            date={date}
+            rows={commandRows}
+            barbers={barberRows.map((barber) => ({
+              id: barber.id,
+              name: barber.name,
+              serviceIds: links.filter((link) => link.barberId === barber.id).map((link) => link.serviceId),
+            }))}
+            workingBarberIds={workingBarbers.map((barber) => barber.id)}
+            openMinutesPerBarber={openMinutesPerBarber}
+            nowMin={salonMinuteOfDay()}
+            isToday={date === todayISO()}
+          />
         )}
       </Panel>
 
@@ -340,7 +396,30 @@ export default async function AdminDashboard({
         )}
       </Panel>
 
-      <Panel id="services" title="سرویس‌های سالن و قیمت‌گذاری">
+      <Panel
+        id="skills"
+        title="ماتریس مهارت و ارائهٔ خدمات"
+        description="همان قاعده‌ای که موتور زمان‌بندی اجرا می‌کند: مهارت تأییدشده + تخصیص خدمت به آرایشگر"
+      >
+        <SkillMatrix
+          barbers={barberRows.map((barber) => ({
+            id: barber.id,
+            name: barber.name,
+            approvedSkillIds: skillLinks
+              .filter((skill) => skill.barberId === barber.id)
+              .map((skill) => skill.skillId),
+          }))}
+          services={serviceRows.map((service) => ({
+            id: service.id,
+            name: service.name,
+            requiredSkillId: service.requiredSkillId,
+          }))}
+          links={links.map((link) => ({ barberId: link.barberId, serviceId: link.serviceId }))}
+          canEdit={isSuper}
+        />
+      </Panel>
+
+      <Panel id="services" title="خدمات سالن و قیمت‌گذاری">
         <ul className="mb-6 divide-y divide-[#c59b4b]/15 rounded-2xl border border-[#c59b4b]/20 bg-white/70 p-2 text-sm">
           {serviceRows.map((s) => (
             <li key={s.id} className="flex items-center justify-between p-3 hover:bg-white rounded-xl">
