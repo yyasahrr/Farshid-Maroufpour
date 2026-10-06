@@ -612,6 +612,11 @@ img.no-outline {
   color: #6b5213;
   border: 1px solid #eadfb8;
 }
+.bento-shortcut-site {
+  background: #e8eef7;
+  color: #24405f;
+  border: 1px solid #d3ddec;
+}
 .bento-shortcut-contact {
   background: #e3f0e9;
   color: #2f4a3a;

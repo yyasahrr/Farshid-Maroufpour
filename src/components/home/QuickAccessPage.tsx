@@ -10,8 +10,14 @@ import { AtelierVideo } from "@/components/atelier-video";
 import { heroIntro } from "@/components/motion";
 import { CONTACT_ADDRESS, CONTACT_PHONE_DISPLAY, CONTACT_PHONE_TEL, OPENING_HOURS } from "@/lib/site";
 
-type Shortcut = { href: string; title: string; caption: string; icon: IconName; tone: "academy" | "shop" };
+type Shortcut = { href: string; title: string; caption: string; icon: IconName; tone: "academy" | "shop" | "site" };
+/**
+ * The hub holds exactly five destinations: booking (primary), the public site,
+ * the shop, the academy and the address dialog. Nothing else belongs here —
+ * a visitor should not have to read a menu to make one decision.
+ */
 const shortcuts: Shortcut[] = [
+  { href: "/home", title: "وبسایت", caption: "درباره سالن و کارها", icon: "home", tone: "site" },
   { href: "/academy", title: "آکادمی", caption: "دوره‌های آموزشی", icon: "cap", tone: "academy" },
   { href: "/shop", title: "فروشگاه", caption: "محصولات پیرایش", icon: "diamond", tone: "shop" },
 ];
@@ -41,8 +47,10 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
   }, []);
 
   function book() {
-    if (user) router.push("/booking");
-    else setAuthOpen(true);
+    // Login is deliberately NOT required here: a visitor may browse services,
+    // dates and complete time suggestions first, and only proves identity at the
+    // moment a slot is held.
+    router.push("/booking");
   }
 
   return (
@@ -137,7 +145,11 @@ export function QuickAccessPage({ initialUser, demoPhoneHint }: { initialUser: A
               href={item.href}
               data-hero-card=""
               className={`focus-ring bento-card-interactive flex min-h-[118px] flex-col items-start justify-between rounded-[20px] p-4 text-right ${
-                item.tone === "academy" ? "bento-shortcut-academy" : "bento-shortcut-shop"
+                item.tone === "academy"
+                  ? "bento-shortcut-academy"
+                  : item.tone === "site"
+                    ? "bento-shortcut-site"
+                    : "bento-shortcut-shop"
               }`}
             >
               <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-white/70">

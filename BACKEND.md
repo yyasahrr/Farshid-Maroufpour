@@ -76,9 +76,9 @@ Copy `.env.local` (already present) and adjust as needed:
 | `barber_services` | Per-barber service overrides (price/duration) |
 | `salon_schedule` / `barber_schedule` | Opening hours |
 | `blocked_times` | Manual time blocks (vacation, meetings) |
-| `appointments` | Bookings |
+| `appointments` | Bookings (one row per service assignment, `booking_group_id` = one customer visit) |
 | `classes` / `class_registrations` | Academy workshops & masterclasses |
-| `payments` | Payment records (deposit / full payment) |
+| `payments` | Payment records; `kind` = `APPOINTMENT` \| `APPOINTMENT_GROUP` \| `CLASS` |
 | `portfolio_items` | Barber portfolio / gallery |
 | `reviews` | Client reviews |
 | `notifications` | In-app notifications for staff |
@@ -86,8 +86,29 @@ Copy `.env.local` (already present) and adjust as needed:
 | `app_secrets` | Generated signing keys |
 | `otps` | OTP codes (preview mode) |
 | `booking_policy_acceptance` | Policy acceptance records |
-| `booking_holds` | Temporary slot holds |
+| `booking_holds` | Temporary slot holds (expiry enforced in every availability query) |
 | `products` | Shop catalogue |
+
+## Scheduling engine
+
+There is exactly **one** scheduling implementation:
+
+- `src/lib/visit-planner.ts` — pure engine. Given a day snapshot it returns every
+  *complete* visit (chain of all selected services, qualified barbers, working
+  windows, buffers, blocked time, holds), ranked, plus `validateVisitItems()` —
+  the write guard the hold and creation routes call before touching the database.
+- `src/lib/visit-planner-db.ts` — the only adapter; batches the Drizzle queries
+  and builds the day snapshot. Expired `PENDING` rows and cancelled appointments
+  are free, live holds are not.
+- `src/lib/service-catalog.ts` — capability and pricing (`resolveService`): active
+  service, active barber, explicit `barber_services` link and, when the service
+  declares `requiredSkillId`, an approved `barber_skills` row.
+- `src/lib/availability.ts` — no rules of its own; it renders the slot grid and
+  forward-scan helpers on top of the engine.
+
+A start is only ever shown when a complete visit can be delivered, and every
+mutation (booking, hold, staff reassignment) is revalidated through the same
+guard inside a transaction.
 
 ## Migrations
 
@@ -116,17 +137,34 @@ REST endpoints under `/api`:
 | `POST` | `/api/auth/complete-onboarding` | First-time name step |
 | `POST` | `/api/auth/policy/accept` | Record policy acceptance |
 | `POST` | `/api/auth/logout` | Clear the session |
-| `GET` | `/api/availability` | Slot availability for a barber/service/date |
-| `GET` | `/api/available-barbers` | Barbers offering a service |
-| `POST` | `/api/booking/hold` | Create a 10-minute slot hold |
-| `POST` | `/api/booking/cancel` | Cancel a booking |
-| `POST` | `/api/appointments` | Create an appointment |
+| `GET` | `/api/availability` | Slot grid for one barber/service/date (presentation over the planner) |
+| `GET` | `/api/booking/available-barbers` | Barbers offering a service (with next open time) |
+| `POST` | `/api/booking/plan` | Complete visit plans for one date (teams, start times, prices) |
+| `GET` | `/api/booking/calendar` | Which of the next ≤21 days have at least one complete plan |
+| `POST` | `/api/booking/hold` | Create a 10-minute hold for a whole visit (revalidated by the planner) |
+| `POST` | `/api/booking/cancel` | Cancel a booking; a grouped visit is cancelled as a whole |
+| `POST` | `/api/appointments` | Create a single appointment (staff / legacy single-service path) |
+| `POST` | `/api/appointments/group` | Create a whole visit in one transaction (`booking_group_id` + one payment) |
 | `GET` | `/api/appointments` | List appointments (staff) |
 | `GET` | `/api/appointments/track` | Track an appointment by phone |
 | `POST` | `/api/classes/register` | Register for a class |
 | `POST` | `/api/payments/verify` | Verify a payment (signed webhook) |
 | `GET` | `/api/customer/bookings` | Customer's bookings |
 | `GET` | `/api/shop/products` | Shop catalogue |
+
+## Tests
+
+```bash
+npm run typecheck      # tsc --noEmit
+npm run lint           # eslint .
+npm run build          # Next production build (needs DATABASE_URL present)
+npm run test:planner   # planner contract tests (no database required)
+npm run test:e2e       # Playwright end-to-end (requires Postgres + seeded data)
+```
+
+Planner tests use an in-memory data source, so they run without PostgreSQL. The
+browser suites and `db:*` scripts do need a live database; they cannot run in an
+environment without PostgreSQL.
 
 ## Demo credentials
 
