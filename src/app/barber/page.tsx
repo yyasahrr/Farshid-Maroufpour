@@ -242,7 +242,11 @@ export default async function BarberDashboard() {
                     </p>
                     <ul className="mt-2 space-y-1.5 text-sm">
                       {mine.map((segment) => (
-                        <li key={segment.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <li
+                          key={segment.id}
+                          data-barber-segment={segment.id}
+                          className="flex flex-wrap items-center gap-x-3 gap-y-1"
+                        >
                           <span className="w-[104px] font-bold tabular-nums" dir="ltr">
                             {minutesToLabel(segment.startMin)}–{minutesToLabel(segment.endMin)}
                           </span>

@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("home entry screen has video background, brand identity, and 4 bento actions", async ({
+test("home entry screen has video background, brand identity, and 5 destinations", async ({
   page,
 }, testInfo) => {
   const errors: string[] = [];
@@ -19,11 +19,15 @@ test("home entry screen has video background, brand identity, and 4 bento action
   // (the project runs tests under reduced motion, so video stays paused).
   await expect(page.locator('img[src*="video-poster"]').first()).toBeVisible();
 
-  // 4 Bento Action Buttons / Links
+  // Exactly five destinations: booking, site, academy, shop, address.
   await expect(page.getByRole("button", { name: "رزرو خدمات" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "وبسایت" })).toHaveAttribute("href", "/home");
   await expect(page.getByRole("link", { name: "آکادمی دوره‌های آموزشی" })).toBeVisible();
   await expect(page.getByRole("link", { name: "فروشگاه" })).toBeVisible();
   await expect(page.getByRole("button", { name: "آدرس و تماس" })).toBeVisible();
+  await expect(
+    page.locator("a.bento-card-interactive, button.bento-card-interactive"),
+  ).toHaveCount(5);
 
   // No horizontal overflow
   const overflow = await page.evaluate(
@@ -55,47 +59,44 @@ test("contact modal opens from bento action and displays salon address and phone
   await expect(modal).not.toBeVisible();
 });
 
-test("booking asks for an account after barber selection and before holding the slot", async ({
+test("booking shows complete plans without an account and asks for identity only when submitting", async ({
   page,
 }) => {
-  // Clear any existing cookie to prove account setup is deferred until a barber is selected.
   await page.context().clearCookies();
-
   await page.goto("/booking");
 
-  // Browsing services and availability does not require an account.
+  // Browsing services, dates and plans never requires an account.
   await expect(page.getByRole("dialog", { name: "ورود و ثبت‌نام" })).toHaveCount(0);
 
-  // Step 0: pick a NO_PAYMENT service so the flow ends on the receipt
+  // STEP 1 — services: a NO_PAYMENT service keeps the assertion on the receipt.
   await expect(page.getByRole("heading", { name: "چه خدمتی می‌خواهید؟" })).toBeVisible();
-  const initialAvailability = page.waitForResponse((response) =>
-    response.url().includes("/api/booking/available-barbers"),
-  );
   await page.getByRole("button", { name: /اصلاح مو/ }).first().click();
-  await initialAvailability;
+  await page.getByRole("button", { name: "ادامه" }).click();
 
-  // Step 1: pick the first day with a free slot.
-  await expect(page.getByRole("heading", { name: "چه زمانی مناسب است؟" })).toBeVisible();
-  const dates = page.getByRole("group", { name: "تاریخ نوبت" }).getByRole("button");
-  const slot = page.getByRole("button", { name: /آزاد$/ }).first();
-  let foundAvailableDate = await slot.isVisible();
-  for (let index = 1; index < await dates.count() && !foundAvailableDate; index += 1) {
-    const availabilityResponse = page.waitForResponse((response) =>
-      response.url().includes("/api/booking/available-barbers"),
-    );
+  // STEP 2 — reservation preference: earliest is the default.
+  await expect(page.getByRole("heading", { name: "چطور زمان‌بندی شود؟" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /زودترین زمان/ })).toBeChecked();
+  await page.getByRole("button", { name: "دیدن زمان‌های ممکن" }).click();
+
+  // STEP 3 — smart calendar: only days with a complete plan are offered.
+  await expect(page.getByRole("heading", { name: "کِی وقت دارید؟" })).toBeVisible();
+  const planResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/booking/plan") && response.request().method() === "POST",
+  );
+  const dates = page.getByRole("group", { name: "انتخاب تاریخ" }).getByRole("button");
+  const startChip = page.getByRole("group", { name: "انتخاب ساعت شروع" }).getByRole("button").first();
+  let found = await startChip.isVisible().catch(() => false);
+  for (let index = 0; index < (await dates.count()) && !found; index += 1) {
     await dates.nth(index).click();
-    await availabilityResponse;
-    foundAvailableDate = await slot.isVisible();
+    await planResponse.catch(() => undefined);
+    found = await startChip.isVisible().catch(() => false);
   }
-  expect(foundAvailableDate).toBe(true);
-  await slot.click();
+  expect(found).toBe(true);
+  await startChip.click();
 
-  // Step 2: choose a barber before opening the account flow.
-  await expect(page.getByRole("heading", { name: "کدام آرایشگر؟" })).toBeVisible();
-  await page.getByRole("button", { name: "انتخاب", exact: true }).first().click();
-  await page.getByRole("button", { name: "ورود / ساخت حساب و ادامه" }).click();
-
-  // OTP and first-time account setup happen before the hold and review.
+  // STEP 4 — review: no account yet, so the submit button opens the auth dialog.
+  await expect(page.getByRole("heading", { name: "بازبینی و ثبت نوبت" })).toBeVisible();
+  await page.getByRole("button", { name: /ورود و ثبت|ثبت نوبت|تأیید/ }).click();
   const authModal = page.getByRole("dialog", { name: "ورود و ثبت‌نام" });
   await expect(authModal).toBeVisible();
   await authModal.locator("input[type='tel']").fill("09129990099");
@@ -108,21 +109,15 @@ test("booking asks for an account after barber selection and before holding the 
     await authModal.getByRole("button", { name: "ادامه" }).click();
   }
 
-  // The account is created before policy acceptance and slot hold.
+  // Policy is accepted once, then the hold is taken and the visit is created.
   const policySheet = page.getByRole("dialog", { name: "نکات مهم رزرو" });
   if (await policySheet.isVisible().catch(() => false)) {
     await policySheet.getByRole("checkbox").check();
     await policySheet.getByRole("button", { name: "تأیید و ادامه" }).click();
   }
 
-  // Step 3: review shows the signed-in customer and hold timer, then submit.
-  await expect(page.getByRole("heading", { name: "خلاصه رزرو" })).toBeVisible();
-  await expect(page.getByText("کاربر رزرو")).toBeVisible();
-  await page.getByRole("button", { name: "تأیید و ثبت نوبت" }).click();
-
-  // Receipt with tracking code
-  await expect(page.getByRole("heading", { name: "نوبت شما تأیید شد" })).toBeVisible();
-  await expect(page.getByText("کد رهگیری")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /نوبت شما (ثبت|رزرو) شد/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "مشاهده در پنل من" })).toBeVisible();
 });
 
 test("customer panel displays appointment card and allows viewing history", async ({
