@@ -4,7 +4,9 @@ import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { appointments, auditLogs, bookingHolds, notifications, payments } from "@/db/schema";
-import { buildSlots, getDayContext, resolveService } from "@/lib/availability";
+import { resolveService } from "@/lib/availability";
+import { createDbPlannerSource } from "@/lib/visit-planner-db";
+import { validateVisitItems } from "@/lib/visit-planner";
 import { bookingGroupConflict } from "@/lib/booking-group";
 import { hasAcceptedPolicy } from "@/lib/auth-otp";
 import { addDaysISO, isValidISODate, todayISO } from "@/lib/time";
@@ -92,12 +94,6 @@ export async function POST(request: Request) {
         const service = await resolveService(item.barberId, item.serviceId);
         if (!service)
           return { ok: false as const, error: "یکی از آرایشگران این خدمت را ارائه نمی‌دهد." };
-        const context = await getDayContext(item.barberId, item.date, user.phone);
-        const slot = buildSlots(context, service.barberDurationMin, service.bufferMin, item.date)
-          .find((candidate) => candidate.startMin === item.startMin);
-        if (slot?.state !== "AVAILABLE")
-          return { ok: false as const, error: "یکی از زمان‌های انتخاب‌شده دیگر آزاد نیست." };
-
         resolved.push({ ...item, service });
       }
 
@@ -108,8 +104,28 @@ export async function POST(request: Request) {
         startMin: item.startMin,
         barberDurationMin: item.service.barberDurationMin,
         bufferMin: item.service.bufferMin,
+        clientDurationMin: item.service.durationMin,
       })));
       if (conflict) return { ok: false as const, error: conflict };
+
+      // Final server-side revalidation of every segment with the visit planner:
+      // capability, working hours, blocked time, holds, existing bookings and
+      // per-attendee overlap. Client-supplied times are never trusted.
+      const plannerSource = createDbPlannerSource({
+        serviceIds: resolved.map((item) => item.serviceId),
+        excludePhone: user.phone,
+      });
+      const validation = await validateVisitItems(
+        plannerSource,
+        resolved.map((item) => ({
+          attendeeId: item.attendeeId,
+          barberId: item.barberId,
+          serviceId: item.serviceId,
+          date: item.date,
+          startMin: item.startMin,
+        })),
+      );
+      if (!validation.ok) return { ok: false as const, error: validation.error };
 
       const onlineTotal = resolved.reduce((sum, item) => sum + item.service.amountDueOnline, 0);
       const bookingGroupId = randomUUID();

@@ -21,7 +21,7 @@ export function SiteNavigation({ services, panelHref, userName }: { services: Na
   const [heroVisible, setHeroVisible] = useState(pathname === "/home");
   const dialog = useRef<HTMLDialogElement>(null);
   const menu = useRef<HTMLDetailsElement>(null);
-  const entries = [...links, { href: "/booking", label: "رزرو نوبت" }, { href: "/account", label: "نوبت‌های من" }, ...services.map((service) => ({ href: `/booking?service=${service.id}`, label: service.name }))];
+  const entries = [...links, { href: "/booking", label: "رزرو نوبت" }, { href: "/account", label: "نوبت‌های من" }, ...services.map((service) => ({ href: `/booking?services=${service.id}`, label: service.name }))];
   const results = entries.filter((entry) => entry.label.replace(/ي/g, "ی").includes(query.trim().replace(/ي/g, "ی")));
 
   useEffect(() => {

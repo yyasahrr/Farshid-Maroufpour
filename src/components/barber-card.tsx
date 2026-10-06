@@ -72,7 +72,7 @@ export function BarberCard({ barber }: { barber: BarberCardData }) {
         </Link>
         <Link
           href={first && barber.primaryServiceId
-            ? `/booking?service=${barber.primaryServiceId}&barber=${barber.id}&date=${first.date}&time=${first.startMin}`
+            ? `/booking?services=${barber.primaryServiceId}&barber=${barber.id}&pref=PREFERRED_BARBER&date=${first.date}&time=${first.startMin}`
             : `/booking?barber=${barber.id}`}
           className="ui-button flex-1 !text-xs"
         >

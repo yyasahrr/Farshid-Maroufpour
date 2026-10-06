@@ -169,8 +169,8 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
               <Link
                 href={
                   next && offered[0]
-                    ? `/booking?barber=${barber.id}&service=${offered[0].id}&date=${next.date}&time=${next.startMin}`
-                    : `/booking?barber=${barber.id}`
+                    ? `/booking?barber=${barber.id}&services=${offered[0].id}&pref=PREFERRED_BARBER&date=${next.date}&time=${next.startMin}`
+                    : `/booking?barber=${barber.id}&pref=PREFERRED_BARBER`
                 }
                 className="ui-button shrink-0"
               >
@@ -204,7 +204,7 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
                           {service.duration.toLocaleString("fa-IR")} دقیقه · {formatPrice(service.price)}
                         </p>
                       </div>
-                      <Link className="ui-button !min-h-11 !text-xs" href={`/booking?service=${service.id}&barber=${barber.id}`}>
+                      <Link className="ui-button !min-h-11 !text-xs" href={`/booking?services=${service.id}&barber=${barber.id}&pref=PREFERRED_BARBER`}>
                         رزرو
                       </Link>
                     </div>
@@ -280,7 +280,7 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
                   ? `نزدیک‌ترین زمان: ${formatPersianDate(next.date)}، ${minutesToLabel(next.startMin)}`
                   : "برای دیدن روزهای بعد، صفحه رزرو را باز کنید."}
               </p>
-              <Link href={next && offered[0] ? `/booking?barber=${barber.id}&service=${offered[0].id}&date=${next.date}&time=${next.startMin}` : `/booking?barber=${barber.id}`} className="ui-button mt-5 w-full">
+              <Link href={next && offered[0] ? `/booking?barber=${barber.id}&services=${offered[0].id}&pref=PREFERRED_BARBER&date=${next.date}&time=${next.startMin}` : `/booking?barber=${barber.id}&pref=PREFERRED_BARBER`} className="ui-button mt-5 w-full">
                 انتخاب زمان نوبت
               </Link>
             </div>

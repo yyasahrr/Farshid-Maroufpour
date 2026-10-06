@@ -3,7 +3,9 @@ import { and, eq, lt, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { appointments, bookingHolds } from "@/db/schema";
-import { buildSlots, getDayContext, resolveService } from "@/lib/availability";
+import { resolveService } from "@/lib/availability";
+import { createDbPlannerSource } from "@/lib/visit-planner-db";
+import { validateVisitItems } from "@/lib/visit-planner";
 import { bookingGroupConflict } from "@/lib/booking-group";
 import { addDaysISO, isValidISODate, todayISO } from "@/lib/time";
 import { getCurrentUser } from "@/lib/session";
@@ -75,18 +77,28 @@ export async function POST(request: Request) {
         startMin: item.startMin,
         barberDurationMin: item.service.barberDurationMin,
         bufferMin: item.service.bufferMin,
+        clientDurationMin: item.service.durationMin,
       })));
       if (conflict) return { ok: false as const, error: conflict };
 
-      for (let index = 0; index < resolved.length; index += 1) {
-        const item = resolved[index];
-        const context = await getDayContext(item.barberId, item.date, phone);
-        const slot = buildSlots(context, item.service.barberDurationMin, item.service.bufferMin, item.date)
-          .find((candidate) => candidate.startMin === item.startMin);
-        if (slot?.state !== "AVAILABLE")
-          return { ok: false as const, error: "یکی از زمان‌ها دیگر آزاد نیست. ساعت دیگری را انتخاب کنید." };
-
-      }
+      // The hold protects the exact resources of the planned visit: capability,
+      // working windows, blocked time, existing appointments and live holds are
+      // re-checked with the same engine that produced the plan.
+      const source = createDbPlannerSource({
+        serviceIds: resolved.map((item) => item.serviceId),
+        excludePhone: phone,
+      });
+      const validation = await validateVisitItems(
+        source,
+        resolved.map((item) => ({
+          attendeeId: item.attendeeId,
+          barberId: item.barberId,
+          serviceId: item.serviceId,
+          date: item.date,
+          startMin: item.startMin,
+        })),
+      );
+      if (!validation.ok) return { ok: false as const, error: validation.error };
 
       await tx.delete(bookingHolds).where(eq(bookingHolds.clientPhone, phone));
       const expiresAt = new Date(Date.now() + 10 * 60_000);

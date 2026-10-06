@@ -5,6 +5,12 @@ type ScheduledItem = {
   startMin: number;
   barberDurationMin: number;
   bufferMin: number;
+  /**
+   * Time the client spends on this segment (includes processing time). When
+   * present the same attendee cannot be booked into two overlapping segments —
+   * one person cannot sit in two chairs at once.
+   */
+  clientDurationMin?: number;
 };
 
 export function bookingGroupConflict(items: ScheduledItem[]): string | null {
@@ -19,6 +25,15 @@ export function bookingGroupConflict(items: ScheduledItem[]): string | null {
         other.startMin < item.startMin + item.barberDurationMin + item.bufferMin
       )
         return "زمان‌های یک آرایشگر نباید هم‌پوشانی داشته باشند.";
+
+      if (other.attendeeId !== item.attendeeId) continue;
+      const otherClientDuration = other.clientDurationMin ?? other.barberDurationMin;
+      const itemClientDuration = item.clientDurationMin ?? item.barberDurationMin;
+      if (
+        item.startMin < other.startMin + otherClientDuration &&
+        other.startMin < item.startMin + itemClientDuration
+      )
+        return "برای یک نفر نمی‌توان دو خدمت هم‌زمان رزرو کرد؛ ترتیب خدمات را تغییر دهید.";
     }
   }
   return null;
