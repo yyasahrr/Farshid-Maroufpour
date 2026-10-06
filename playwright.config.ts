@@ -16,6 +16,12 @@ export default defineConfig({
   },
   projects: [
     {
+      // Database-free planner contract tests. They exercise the visit planner
+      // through an in-memory data source, so they run anywhere.
+      name: "planner",
+      testDir: "./tests/planner",
+    },
+    {
       name: "desktop",
       use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
     },

@@ -16,7 +16,9 @@
     "db:setup": "tsx scripts/migrate.ts && tsx scripts/seed.ts",
     "db:setup:reset": "tsx scripts/migrate.ts --reset && tsx scripts/seed.ts --reset",
     "db:generate": "drizzle-kit generate --config=drizzle.config.json",
-    "db:studio": "drizzle-kit studio --config=drizzle.config.json"
+    "db:studio": "drizzle-kit studio --config=drizzle.config.json",
+    "test:planner": "playwright test --project=planner",
+    "test:e2e": "playwright test --project=desktop --project=tablet --project=mobile"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.13.0",

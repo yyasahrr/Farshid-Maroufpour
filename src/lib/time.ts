@@ -1,4 +1,11 @@
 export const SALON_TIME_ZONE = "Asia/Tehran";
+
+/**
+ * Grid the salon schedules on. Every bookable start sits on this step, so a
+ * 10:35 buffer end is never offered as a start; the planner snaps to it and the
+ * slot list in `availability.ts` shares the same constant.
+ */
+export const SLOT_STEP = 30;
 export const WEEKDAY_LABELS = [
   "شنبه",
   "یک‌شنبه",
