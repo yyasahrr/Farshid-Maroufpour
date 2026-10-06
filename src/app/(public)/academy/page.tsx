@@ -13,9 +13,24 @@ import { todayISO } from "@/lib/time";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "آکادمی", description: "دوره‌های عملی پیرایش مردانه؛ برنامه، مدرس، ظرفیت و شهریه را پیش از ثبت‌نام ببینید." };
 
-export default async function AcademyPage() {
-  const [courses, workshops, instructors] = await Promise.all([
-    getCourseCards(),
+/**
+ * Academy entry asks one question first: در سالن یا آنلاین؟
+ *
+ * The mode lives in the URL (`?mode=online`), so it works without JavaScript and
+ * can be linked to directly. Courses are split by the location the salon keeps in
+ * the database — nothing online is invented: an empty list means the salon has
+ * not scheduled an online group yet.
+ */
+export default async function AcademyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
+  const mode = (await searchParams).mode === "online" ? "ONLINE" : "ONSITE";
+  const onlineMode = mode === "ONLINE";
+  const [courses, otherModeCourses, workshops, instructors] = await Promise.all([
+    getCourseCards(mode),
+    getCourseCards(onlineMode ? "ONSITE" : "ONLINE"),
     getWorkshopCards(),
     db
       .select({ id: barbers.id, slug: barbers.slug, name: barbers.name, title: barbers.title, imageUrl: barbers.imageUrl })
@@ -55,11 +70,43 @@ export default async function AcademyPage() {
                   مدرسان دوره‌ها
                 </Link>
               </div>
+
+              {/* Chooser: the one question this page asks before showing anything. */}
+              <div
+                role="group"
+                aria-label="نوع دوره"
+                className="mt-6 inline-flex rounded-2xl border border-[#2f4a3a]/15 bg-white/85 p-1"
+              >
+                <Link
+                  href="/academy"
+                  aria-current={!onlineMode ? "page" : undefined}
+                  className={`focus-ring rounded-xl px-4 py-2 text-sm font-bold ${
+                    !onlineMode ? "bg-[#2f4a3a] text-white" : "text-[#2f4a3a]"
+                  }`}
+                >
+                  حضوری در سالن
+                </Link>
+                <Link
+                  href="/academy?mode=online"
+                  aria-current={onlineMode ? "page" : undefined}
+                  className={`focus-ring rounded-xl px-4 py-2 text-sm font-bold ${
+                    onlineMode ? "bg-[#2f4a3a] text-white" : "text-[#2f4a3a]"
+                  }`}
+                >
+                  آنلاین
+                </Link>
+              </div>
             </div>
             <dl className="grid grid-cols-2 gap-3">
               {[
-                { value: courses.length.toLocaleString("fa-IR"), label: "دورهٔ باز" },
-                { value: workshops.length.toLocaleString("fa-IR"), label: "کارگاه حضوری" },
+                {
+                  value: courses.length.toLocaleString("fa-IR"),
+                  label: onlineMode ? "دورهٔ آنلاین باز" : "دورهٔ حضوری باز",
+                },
+                {
+                  value: (onlineMode ? workshops.length : otherModeCourses.length).toLocaleString("fa-IR"),
+                  label: onlineMode ? "کارگاه حضوری" : "دورهٔ آنلاین",
+                },
                 { value: uniqueInstructors.length.toLocaleString("fa-IR"), label: "مدرس فعال" },
                 { value: "عملی", label: "روش آموزش" },
               ].map((item) => (
@@ -74,7 +121,7 @@ export default async function AcademyPage() {
 
         <section id="courses" className="scroll-mt-24">
           <div className="ui-section-head">
-            <h2>دوره‌های در حال ثبت‌نام</h2>
+            <h2>{onlineMode ? "دوره‌های آنلاین در حال ثبت‌نام" : "دوره‌های حضوری در حال ثبت‌نام"}</h2>
             <span className="ui-pill ui-tag-academy">{courses.length.toLocaleString("fa-IR")} دوره</span>
           </div>
           {courses.length ? (
@@ -87,13 +134,29 @@ export default async function AcademyPage() {
             </div>
           ) : (
             <EmptyState
-              title="فعلاً دوره‌ای برای ثبت‌نام باز نیست"
-              description="برای اطلاع از دوره‌های آینده با پذیرش آکادمی در تماس باشید."
+              title={onlineMode ? "دورهٔ آنلاین فعالی برای ثبت‌نام باز نیست" : "فعلاً دوره‌ای برای ثبت‌نام باز نیست"}
+              description={
+                onlineMode
+                  ? "این آکادمی فعلاً دورهٔ آنلاین زمان‌بندی‌شده ندارد. می‌توانید دوره‌های حضوری را ببینید یا برای اطلاع از دوره‌های آینده با پذیرش تماس بگیرید."
+                  : "برای اطلاع از دوره‌های آینده با پذیرش آکادمی در تماس باشید."
+              }
+              action={
+                onlineMode ? (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Link href="/academy" className="ui-button ui-button-quiet">
+                      دیدن دوره‌های حضوری
+                    </Link>
+                    <a href={`tel:${CONTACT_PHONE_TEL}`} dir="ltr" className="ui-link font-mono">
+                      {CONTACT_PHONE_TEL}
+                    </a>
+                  </div>
+                ) : undefined
+              }
             />
           )}
         </section>
 
-        {workshops.length > 0 && (
+        {!onlineMode && workshops.length > 0 && (
           <section className="mt-16">
             <div className="ui-section-head"><h2>کارگاه‌های حضوری</h2></div>
             <div className="space-y-3">
@@ -106,7 +169,7 @@ export default async function AcademyPage() {
           </section>
         )}
 
-        {uniqueInstructors.length > 0 && (
+        {!onlineMode && uniqueInstructors.length > 0 && (
           <section id="instructors" className="mt-16 scroll-mt-24">
             <div className="ui-section-head"><h2>مدرس‌های دوره‌های جاری</h2></div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

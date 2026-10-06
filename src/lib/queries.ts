@@ -127,7 +127,14 @@ export async function getBarberSkills(barberId: number) {
   return rows.map((r) => r.name);
 }
 
-export async function getCourseCards(): Promise<CourseCardData[]> {
+/**
+ * Open courses, optionally split by delivery mode.
+ *
+ * `mode` is derived from the class location the salon maintains («آنلاین» classes
+ * are online, everything else happens in the salon); it is never hard-coded here,
+ * so a mode the salon has not scheduled simply comes back empty.
+ */
+export async function getCourseCards(mode?: "ONSITE" | "ONLINE"): Promise<CourseCardData[]> {
   const rows = await db
     .select({
       slug: classes.slug,
@@ -143,10 +150,21 @@ export async function getCourseCards(): Promise<CourseCardData[]> {
       instructorName: barbers.name,
       instructorSlug: barbers.slug,
       instructorId: classes.instructorBarberId,
+      location: classes.location,
     })
     .from(classes)
     .leftJoin(barbers, eq(barbers.id, classes.instructorBarberId))
-    .where(and(eq(classes.status, "OPEN"), gte(classes.startsOn, todayISO())));
+    .where(
+      and(
+        eq(classes.status, "OPEN"),
+        gte(classes.startsOn, todayISO()),
+        mode === "ONLINE"
+          ? sql`${classes.location} like ${"%آنلاین%"}`
+          : mode === "ONSITE"
+            ? sql`${classes.location} not like ${"%آنلاین%"}`
+            : undefined,
+      ),
+    );
 
   return Promise.all(
     rows.map(async (c) => ({
