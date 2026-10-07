@@ -25,6 +25,7 @@
   /* neutral ramp */
   --color-bone-50: #fdfcf9;
   --color-bone-100: #f6f5f1;
+  --color-bone-150: #e2e5df;
   --color-bone-200: #edece8;
   --color-bone-300: #e5e0d4;
   --color-bone-500: #59636b;
@@ -40,10 +41,14 @@
   --color-brand-600: #14432f;
   --color-brand-700: #0f5a3b;
   --color-brand-800: #0b4a30;
+  --color-brand-900: #10261b;
+  --color-brand-950: #07170f;
 
   /* brass ramp — second accent, earns its place on price and shop surfaces */
   --color-brass-50: #f7f0d8;
   --color-brass-200: #eadfb8;
+  --color-brass-400: #c59b4b;
+  --color-brass-600: #855e16;
   --color-brass-700: #6b5213;
   --color-brass-800: #8a6a1e;
 
@@ -184,6 +189,18 @@ button:disabled {
   max-width: 1180px;
   padding-inline: clamp(16px, 4vw, 48px);
   margin-inline: auto;
+}
+
+/* Wider measure for brand-facing pages; customer/ops shells retain their base width. */
+.public-container {
+  width: 100%;
+  max-width: 1380px;
+  padding-inline: clamp(16px, 3vw, 44px);
+  margin-inline: auto;
+}
+
+.public-page {
+  padding-block: clamp(30px, 4vw, 54px) 72px;
 }
 
 .ui-page {
@@ -370,10 +387,8 @@ img.no-outline {
 }
 
 .home-page-section {
-  min-height: 90vh;
-  min-height: 90svh;
-  display: grid;
-  align-items: center;
+  min-height: 0;
+  display: block;
   box-sizing: border-box;
 }
 
@@ -475,8 +490,12 @@ img.no-outline {
   .home-service-icon,
   .home-team-member,
   .home-portfolio-card,
-  .home-portfolio-image {
+  .home-portfolio-image,
+  .home-team-photo img,
+  .barber-card-image,
+  .gallery-editorial-image {
     transition: none;
+    transform: none !important;
   }
 
   .home-portfolio-caption {
@@ -485,6 +504,47 @@ img.no-outline {
 
   .home-hero-scroll svg {
     animation: none;
+  }
+}
+
+
+.home-service-row {
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+.home-team-card {
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.home-team-photo img,
+.barber-card-image,
+.gallery-editorial-image {
+  transition: transform 420ms var(--ease-standard);
+}
+.barber-card-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(7 23 15 / 92%),
+    rgb(7 23 15 / 10%) 48%,
+    transparent 76%
+  );
+}
+.gallery-editorial-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(7 23 15 / 92%),
+    rgb(7 23 15 / 12%) 52%,
+    transparent 78%
+  );
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .home-service-row:hover {
+    color: var(--color-action-primary);
+  }
+  .home-team-photo:hover img,
+  .barber-editorial-card:hover .barber-card-image,
+  .gallery-editorial-item:hover .gallery-editorial-image {
+    transform: scale(1.025);
   }
 }
 

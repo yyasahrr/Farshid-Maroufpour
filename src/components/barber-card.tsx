@@ -3,81 +3,138 @@ import Link from "next/link";
 import { formatPersianDate, formatPrice, minutesToLabel } from "@/lib/time";
 import { Badge, Stars } from "@/components/ui-cards";
 import { Icon } from "@/components/icons";
+import { isRemoteImage, safeImageUrl } from "@/lib/service-media";
 
 export type BarberCardData = {
-  id: number; slug: string; name: string; title: string; bio: string; experienceYears: number;
-  imageUrl: string | null; rating: number | null; reviewCount: number;
-  serviceNames: string[]; startPrice: number | null; primaryServiceId: number | null;
+  id: number;
+  slug: string;
+  name: string;
+  title: string;
+  bio: string;
+  experienceYears: number;
+  imageUrl: string | null;
+  rating: number | null;
+  reviewCount: number;
+  serviceNames: string[];
+  startPrice: number | null;
+  primaryServiceId: number | null;
   nextSlots: { date: string; startMin: number }[];
 };
 
 export function BarberCard({ barber }: { barber: BarberCardData }) {
   const first = barber.nextSlots[0];
+  const image = barber.imageUrl ? safeImageUrl(barber.imageUrl) : null;
+
   return (
-    <article data-reveal="" className="ui-card flex h-full flex-col p-5">
-      <div className="flex items-center gap-4">
-        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[#e2efe8]">
-          {barber.imageUrl ? (
-            <Image src={barber.imageUrl} alt={barber.name} fill sizes="64px" className="object-cover" />
+    <article className="barber-editorial-card flex h-full flex-col">
+      <Link
+        href={`/barbers/${barber.slug}`}
+        aria-label={`پروفایل ${barber.name}`}
+        className="group focus-ring block overflow-hidden"
+      >
+        <div className="barber-card-photo relative aspect-[4/5] overflow-hidden bg-brand-50">
+          {image ? (
+            <Image
+              src={image}
+              alt=""
+              fill
+              sizes="(max-width: 639px) 92vw, (max-width: 1023px) 46vw, 31vw"
+              className="barber-card-image object-cover"
+              unoptimized={isRemoteImage(image)}
+            />
           ) : (
-            <span aria-hidden="true" className="flex h-full w-full items-center justify-center text-xl font-black text-[#2f4a3a]">
-              <Icon name="user" className="h-7 w-7" />
+            <span
+              aria-hidden="true"
+              className="absolute inset-0 flex items-center justify-center text-brand-600"
+            >
+              <Icon name="user" className="h-12 w-12" weight="strong" />
             </span>
           )}
-        </div>
-        <div className="min-w-0">
-          <h2 className="truncate text-lg font-black">{barber.name}</h2>
-          <p className="text-sm text-[#8a6a1e]">{barber.title}</p>
-        </div>
-      </div>
-
-      <p className="mt-4 line-clamp-2 min-h-[46px] text-sm leading-7 text-[#5f7168]">{barber.bio}</p>
-
-      {barber.serviceNames.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {barber.serviceNames.slice(0, 3).map((name) => (
-            <Badge tone="neutral" key={name}>{name}</Badge>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-4 flex items-center justify-between gap-2 text-xs text-[#5f7168]">
-        <span>{barber.experienceYears.toLocaleString("fa-IR")} سال سابقه</span>
-        {barber.rating !== null && (
-          <span className="inline-flex items-center gap-1.5">
-            <Stars rating={barber.rating} />
-            <b className="text-[#1f2e27]">{barber.rating.toFixed(1)}</b>
-            <span>({barber.reviewCount.toLocaleString("fa-IR")})</span>
+          <span
+            aria-hidden="true"
+            className="barber-card-scrim absolute inset-0"
+          />
+          <span className="absolute inset-x-0 bottom-0 p-4 text-right text-white sm:p-5">
+            <span className="inline-block border-b border-brass-400 pb-1 text-xs font-semibold text-brass-200">
+              {barber.title}
+            </span>
+            <span className="mt-2 block text-xl font-black leading-8 sm:text-2xl">
+              {barber.name}
+            </span>
+            {barber.rating !== null && (
+              <span className="mt-1 inline-flex items-center gap-2 text-xs text-white/85">
+                <Stars rating={barber.rating} />
+                <b>{barber.rating.toFixed(1)}</b>
+                <span>({barber.reviewCount.toLocaleString("fa-IR")})</span>
+              </span>
+            )}
           </span>
-        )}
-      </div>
+        </div>
+      </Link>
 
-      <div className="mt-4 border-t border-[#e2e5df] pt-4">
-        <p className="text-xs font-semibold text-[#5f7168]">اولین زمان آزاد</p>
-        {first ? (
-          <p className="mt-1.5 text-sm font-bold text-[#2f4a3a]">
-            {formatPersianDate(first.date)}، ساعت {minutesToLabel(first.startMin)}
+      <div className="flex flex-1 flex-col pt-3">
+        <p className="text-xs font-semibold text-bone-500">
+          {barber.experienceYears.toLocaleString("fa-IR")} سال سابقه
+        </p>
+        {barber.bio && (
+          <p className="mt-2 line-clamp-3 text-sm leading-7 text-bone-500">
+            {barber.bio}
           </p>
-        ) : (
-          <p className="mt-1.5 text-sm text-[#5f7168]">این هفته وقتی پیدا نشد؛ روزهای بعد را ببینید.</p>
         )}
-        {barber.startPrice !== null && (
-          <p className="mt-2 text-xs text-[#5f7168]">شروع از {formatPrice(barber.startPrice)}</p>
-        )}
-      </div>
 
-      <div className="mt-auto flex items-center gap-2 pt-5">
-        <Link href={`/barbers/${barber.slug}`} className="ui-button ui-button-quiet flex-1 !text-xs">
-          پروفایل
-        </Link>
-        <Link
-          href={first && barber.primaryServiceId
-            ? `/booking?services=${barber.primaryServiceId}&barber=${barber.id}&pref=PREFERRED_BARBER&date=${first.date}&time=${first.startMin}`
-            : `/booking?barber=${barber.id}`}
-          className="ui-button flex-1 !text-xs"
-        >
-          رزرو <Icon name="arrow" className="h-4 w-4" />
-        </Link>
+        {barber.serviceNames.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {barber.serviceNames.slice(0, 3).map((name) => (
+              <Badge tone="neutral" key={name}>
+                {name}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto border-t border-bone-150 pt-3">
+          <div className="flex items-start justify-between gap-3 text-xs text-bone-500">
+            <div>
+              <span className="font-semibold">اولین زمان آزاد</span>
+              {first ? (
+                <p className="mt-1 text-sm font-bold text-brand-400">
+                  {formatPersianDate(first.date)}، ساعت{" "}
+                  {minutesToLabel(first.startMin)}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm leading-6">
+                  این هفته وقتی پیدا نشد؛ روزهای بعد را ببینید.
+                </p>
+              )}
+            </div>
+            {barber.startPrice !== null && (
+              <span className="shrink-0 text-left">
+                <span className="block text-[11px]">شروع از</span>
+                <b className="mt-1 block text-sm text-bone-700">
+                  {formatPrice(barber.startPrice)}
+                </b>
+              </span>
+            )}
+          </div>
+          <div className="mt-4 flex items-center gap-2">
+            <Link
+              href={`/barbers/${barber.slug}`}
+              className="focus-ring ui-button ui-button-quiet min-h-11 flex-1 !text-xs"
+            >
+              پروفایل
+            </Link>
+            <Link
+              href={
+                first && barber.primaryServiceId
+                  ? `/booking?services=${barber.primaryServiceId}&barber=${barber.id}&pref=PREFERRED_BARBER&date=${first.date}&time=${first.startMin}`
+                  : `/booking?barber=${barber.id}`
+              }
+              className="focus-ring ui-button min-h-11 flex-1 !text-xs"
+            >
+              رزرو <Icon name="arrow" className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
       </div>
     </article>
   );

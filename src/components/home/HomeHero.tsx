@@ -8,7 +8,11 @@ import type { HeroSettings } from "@/lib/hero-settings";
 
 function videoMime(url: string): string {
   const extension = url.split(".").pop()?.toLowerCase();
-  return extension === "webm" ? "video/webm" : extension === "mov" ? "video/quicktime" : "video/mp4";
+  return extension === "webm"
+    ? "video/webm"
+    : extension === "mov"
+      ? "video/quicktime"
+      : "video/mp4";
 }
 
 export function HomeHero({ settings }: { settings: HeroSettings }) {
@@ -20,7 +24,9 @@ export function HomeHero({ settings }: { settings: HeroSettings }) {
     const video = videoRef.current;
     if (!video) return;
 
-    const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const motionPreference = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
     const syncPlayback = () => {
       if (motionPreference.matches) {
         video.pause();
@@ -28,13 +34,16 @@ export function HomeHero({ settings }: { settings: HeroSettings }) {
         return;
       }
 
-      void video.play().then(() => {
-        setIsPlaying(true);
-        setPlaybackMessage("");
-      }).catch(() => {
-        setIsPlaying(false);
-        setPlaybackMessage("برای پخش ویدئو، دکمهٔ پخش را انتخاب کنید.");
-      });
+      void video
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          setPlaybackMessage("");
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setPlaybackMessage("برای پخش ویدئو، دکمهٔ پخش را انتخاب کنید.");
+        });
     };
 
     syncPlayback();
@@ -70,7 +79,7 @@ export function HomeHero({ settings }: { settings: HeroSettings }) {
     <section
       id="home-hero"
       aria-labelledby="home-hero-title"
-      className="home-hero relative isolate min-h-[100svh] overflow-hidden bg-[#10261b] text-white"
+      className="home-hero relative isolate min-h-[90svh] overflow-hidden bg-[#10261b] text-white lg:min-h-[94svh]"
     >
       {settings.mediaType === "video" ? (
         <video
@@ -85,63 +94,98 @@ export function HomeHero({ settings }: { settings: HeroSettings }) {
           onPause={() => setIsPlaying(false)}
           onError={() => {
             setIsPlaying(false);
-            setPlaybackMessage("ویدئو در دسترس نیست. تصویر جایگزین نمایش داده می‌شود.");
+            setPlaybackMessage(
+              "ویدئو در دسترس نیست. تصویر جایگزین نمایش داده می‌شود.",
+            );
           }}
           className="absolute inset-0 h-full w-full object-cover"
         >
-          <source media="(max-width: 639px)" src={settings.mobileMediaUrl || settings.desktopMediaUrl} type={videoMime(settings.mobileMediaUrl || settings.desktopMediaUrl)} />
-          <source src={settings.desktopMediaUrl} type={videoMime(settings.desktopMediaUrl)} />
+          <source
+            media="(max-width: 639px)"
+            src={settings.mobileMediaUrl || settings.desktopMediaUrl}
+            type={videoMime(
+              settings.mobileMediaUrl || settings.desktopMediaUrl,
+            )}
+          />
+          <source
+            src={settings.desktopMediaUrl}
+            type={videoMime(settings.desktopMediaUrl)}
+          />
           مرورگر شما از پخش ویدئو پشتیبانی نمی‌کند.
         </video>
       ) : (
         <div aria-hidden="true" className="absolute inset-0">
-          <Image src={settings.mobileMediaUrl || settings.desktopMediaUrl} alt="" fill sizes="100vw" className="object-cover sm:hidden" />
-          <Image src={settings.desktopMediaUrl} alt="" fill sizes="100vw" className="hidden object-cover sm:block" />
+          <Image
+            src={settings.mobileMediaUrl || settings.desktopMediaUrl}
+            alt=""
+            fill
+            sizes="100vw"
+            className="object-cover sm:hidden"
+            unoptimized={settings.mobileMediaUrl.startsWith("http")}
+          />
+          <Image
+            src={settings.desktopMediaUrl}
+            alt=""
+            fill
+            sizes="100vw"
+            className="hidden object-cover sm:block"
+            unoptimized={settings.desktopMediaUrl.startsWith("http")}
+          />
         </div>
       )}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-l from-[#07170f]/85 via-[#07170f]/55 to-[#07170f]/35"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-l from-[#07170f]/90 via-[#07170f]/55 to-[#07170f]/25"
       />
-      <div className="home-hero-inner ui-container relative z-10 grid min-h-[100svh] content-center items-center gap-6 pt-24 pb-36 md:grid-cols-[0.9fr_1.1fr] md:gap-8 md:py-28 xl:gap-14">
-        <div data-reveal="" className="min-w-0 max-w-xl text-right">
+      <div className="home-hero-inner public-container relative z-10 flex min-h-[90svh] items-center pb-32 pt-28 lg:min-h-[94svh] lg:pb-28">
+        <div data-reveal="" className="min-w-0 max-w-[720px] text-right">
+          <span
+            aria-hidden="true"
+            className="mb-6 block h-px w-16 bg-[#c59b4b]"
+          />
           <h1
             id="home-hero-title"
-            className="text-[clamp(2.25rem,5.5vw,4.5rem)] leading-[1.25] font-black tracking-tight text-white text-balance"
+            className="text-[clamp(2.4rem,5.5vw,5rem)] leading-[1.2] font-black tracking-tight text-white text-balance"
           >
             {settings.headline}
           </h1>
-          <p className="mt-5 max-w-lg text-base leading-8 text-white/90 sm:text-lg">
+          <p className="mt-5 max-w-[600px] text-base leading-8 text-white/90 sm:text-lg sm:leading-9">
             {settings.subtitle}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href="/booking"
-              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 text-sm font-bold text-[#10261b] transition-colors hover:bg-[#e3f0e9]"
+              className="focus-ring inline-flex min-h-[52px] items-center justify-center rounded-xl bg-bone-50 px-7 text-sm font-extrabold text-[#07170f] transition-colors hover:bg-white"
             >
               {settings.primaryCtaLabel}
             </Link>
             <Link
               href="#services"
-              className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border border-white/70 bg-[#10261b]/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/15"
+              className="focus-ring inline-flex min-h-[52px] items-center justify-center rounded-xl border border-white/60 bg-[#10261b]/35 px-7 text-sm font-semibold text-white transition-colors hover:bg-white/15"
             >
               {settings.secondaryCtaLabel}
             </Link>
           </div>
-          <p className="sr-only" role="status" aria-live="polite">{playbackMessage}</p>
+          <p className="sr-only" role="status" aria-live="polite">
+            {playbackMessage}
+          </p>
         </div>
-
-        <span className="sr-only">فرشید معروف پور</span>
       </div>
       {settings.mediaType === "video" && (
         <button
           type="button"
           onClick={() => void togglePlayback()}
-          aria-label={isPlaying ? "توقف ویدئوی معرفی سالن" : "پخش ویدئوی معرفی سالن"}
+          aria-label={
+            isPlaying ? "توقف ویدئوی معرفی سالن" : "پخش ویدئوی معرفی سالن"
+          }
           aria-pressed={isPlaying}
           className="focus-ring absolute bottom-24 left-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/60 bg-[#10261b]/75 px-4 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-[#10261b] md:bottom-6 md:left-6"
         >
-          <Icon name={isPlaying ? "pause" : "play"} className="h-4 w-4" weight="strong" />
+          <Icon
+            name={isPlaying ? "pause" : "play"}
+            className="h-4 w-4"
+            weight="strong"
+          />
           {isPlaying ? "توقف ویدئو" : "پخش ویدئو"}
         </button>
       )}
@@ -153,7 +197,10 @@ export function HomeHero({ settings }: { settings: HeroSettings }) {
         <span>ادامه</span>
         <Icon name="chevron" aria-hidden="true" className="h-5 w-5" />
       </a>
-      <span className="pointer-events-none absolute right-6 bottom-28 z-10 hidden text-sm font-semibold text-white drop-shadow sm:block md:bottom-6">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute right-6 bottom-28 z-10 hidden text-sm font-semibold text-white drop-shadow sm:block md:bottom-6"
+      >
         فرشید معروف پور
       </span>
     </section>

@@ -55,7 +55,7 @@ export function SiteNavigation({ services, panelHref, userName }: { services: Na
             : "border-[#e2e5df] bg-[#ffffffec] backdrop-blur-md"
         }`}
       >
-        <nav aria-label="ناوبری سایت" className="ui-container flex h-[68px] items-center justify-between gap-2 sm:gap-4">
+        <nav aria-label="ناوبری سایت" className="public-container flex h-[68px] items-center justify-between gap-2 sm:gap-4">
           <Link href="/home" aria-label="آکادمی زیبایی فرشید معروف پور؛ صفحهٔ اصلی" className={`focus-ring flex min-w-0 items-center gap-2 ${headerTextClass}`}>
             <BrandMonogram className="!h-9 !w-[27px] shrink-0" />
             <span className="truncate text-sm font-black sm:text-base">
