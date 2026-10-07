@@ -114,6 +114,7 @@ export async function getGalleryItems(limit?: number): Promise<GalleryItem[]> {
     })
     .from(portfolioItems)
     .innerJoin(barbers, eq(barbers.id, portfolioItems.barberId))
+    .where(eq(barbers.active, true))
     .orderBy(desc(portfolioItems.id));
   return typeof limit === "number" ? query.limit(limit) : query;
 }
@@ -123,7 +124,7 @@ export async function getBarberSkills(barberId: number) {
     .select({ name: skills.name })
     .from(barberSkills)
     .innerJoin(skills, eq(skills.id, barberSkills.skillId))
-    .where(eq(barberSkills.barberId, barberId));
+    .where(and(eq(barberSkills.barberId, barberId), eq(barberSkills.status, "APPROVED")));
   return rows.map((r) => r.name);
 }
 

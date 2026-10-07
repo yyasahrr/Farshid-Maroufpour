@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/icons";
+import type { HeroSettings } from "@/lib/hero-settings";
 
-export function HomeHero() {
+function videoMime(url: string): string {
+  const extension = url.split(".").pop()?.toLowerCase();
+  return extension === "webm" ? "video/webm" : extension === "mov" ? "video/quicktime" : "video/mp4";
+}
+
+export function HomeHero({ settings }: { settings: HeroSettings }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackMessage, setPlaybackMessage] = useState("");
@@ -65,26 +72,33 @@ export function HomeHero() {
       aria-labelledby="home-hero-title"
       className="home-hero relative isolate min-h-[100svh] overflow-hidden bg-[#10261b] text-white"
     >
-      <video
-        ref={videoRef}
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        poster="/images/video-poster.jpg"
-        aria-hidden="true"
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={() => {
-          setIsPlaying(false);
-          setPlaybackMessage("ویدئو در دسترس نیست. تصویر جایگزین نمایش داده می‌شود.");
-        }}
-        className="absolute inset-0 h-full w-full object-cover"
-      >
-        <source media="(max-width: 639px)" src="/video/barber-mobile.mp4" type="video/mp4" />
-        <source src="/video/barber-desktop.mp4" type="video/mp4" />
-        مرورگر شما از پخش ویدئو پشتیبانی نمی‌کند.
-      </video>
+      {settings.mediaType === "video" ? (
+        <video
+          ref={videoRef}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster="/images/video-poster.jpg"
+          aria-hidden="true"
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onError={() => {
+            setIsPlaying(false);
+            setPlaybackMessage("ویدئو در دسترس نیست. تصویر جایگزین نمایش داده می‌شود.");
+          }}
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source media="(max-width: 639px)" src={settings.mobileMediaUrl || settings.desktopMediaUrl} type={videoMime(settings.mobileMediaUrl || settings.desktopMediaUrl)} />
+          <source src={settings.desktopMediaUrl} type={videoMime(settings.desktopMediaUrl)} />
+          مرورگر شما از پخش ویدئو پشتیبانی نمی‌کند.
+        </video>
+      ) : (
+        <div aria-hidden="true" className="absolute inset-0">
+          <Image src={settings.mobileMediaUrl || settings.desktopMediaUrl} alt="" fill sizes="100vw" className="object-cover sm:hidden" />
+          <Image src={settings.desktopMediaUrl} alt="" fill sizes="100vw" className="hidden object-cover sm:block" />
+        </div>
+      )}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-gradient-to-l from-[#07170f]/85 via-[#07170f]/55 to-[#07170f]/35"
@@ -95,23 +109,23 @@ export function HomeHero() {
             id="home-hero-title"
             className="text-[clamp(2.25rem,5.5vw,4.5rem)] leading-[1.25] font-black tracking-tight text-white text-balance"
           >
-            اصلاحی که به سبک تو می‌آید
+            {settings.headline}
           </h1>
           <p className="mt-5 max-w-lg text-base leading-8 text-white/90 sm:text-lg">
-            خدمات پیرایش مردانه را با دیدن قیمت، مدت و تخصص آرایشگر انتخاب کن.
+            {settings.subtitle}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link
               href="/booking"
               className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl bg-white px-6 text-sm font-bold text-[#10261b] transition-colors hover:bg-[#e3f0e9]"
             >
-              رزرو نوبت
+              {settings.primaryCtaLabel}
             </Link>
             <Link
               href="#services"
               className="focus-ring inline-flex min-h-12 items-center justify-center rounded-xl border border-white/70 bg-[#10261b]/35 px-6 text-sm font-semibold text-white transition-colors hover:bg-white/15"
             >
-              دیدن خدمات
+              {settings.secondaryCtaLabel}
             </Link>
           </div>
           <p className="sr-only" role="status" aria-live="polite">{playbackMessage}</p>
@@ -119,16 +133,18 @@ export function HomeHero() {
 
         <span className="sr-only">فرشید معروف پور</span>
       </div>
-      <button
-        type="button"
-        onClick={() => void togglePlayback()}
-        aria-label={isPlaying ? "توقف ویدئوی معرفی سالن" : "پخش ویدئوی معرفی سالن"}
-        aria-pressed={isPlaying}
-        className="focus-ring absolute bottom-24 left-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/60 bg-[#10261b]/75 px-4 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-[#10261b] md:bottom-6 md:left-6"
-      >
-        <Icon name={isPlaying ? "pause" : "play"} className="h-4 w-4" weight="strong" />
-        {isPlaying ? "توقف ویدئو" : "پخش ویدئو"}
-      </button>
+      {settings.mediaType === "video" && (
+        <button
+          type="button"
+          onClick={() => void togglePlayback()}
+          aria-label={isPlaying ? "توقف ویدئوی معرفی سالن" : "پخش ویدئوی معرفی سالن"}
+          aria-pressed={isPlaying}
+          className="focus-ring absolute bottom-24 left-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/60 bg-[#10261b]/75 px-4 text-sm font-bold text-white backdrop-blur-sm transition-colors hover:bg-[#10261b] md:bottom-6 md:left-6"
+        >
+          <Icon name={isPlaying ? "pause" : "play"} className="h-4 w-4" weight="strong" />
+          {isPlaying ? "توقف ویدئو" : "پخش ویدئو"}
+        </button>
+      )}
       <a
         href="#about"
         aria-label="رفتن به بخش بعدی"

@@ -16,11 +16,32 @@ export const users = pgTable(
     id: serial("id").primaryKey(),
     phone: text("phone").notNull(),
     name: text("name").notNull(),
-    role: text("role").notNull().default("CLIENT"), // SUPER_ADMIN | RECEPTIONIST | BARBER | CLIENT
+    /**
+     * Legacy primary role kept for display/compat only. Authorization reads
+     * `user_roles` (multi-role model); this single field is not authoritative.
+     */
+    role: text("role").notNull().default("CLIENT"), // SUPER_ADMIN | MANAGER | RECEPTIONIST | BARBER | CLIENT
     passwordHash: text("password_hash"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("users_phone_idx").on(t.phone)],
+);
+
+/** Multi-role membership: one account may hold several independent roles. */
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("user_roles_unique_idx").on(t.userId, t.role),
+    index("user_roles_role_idx").on(t.role),
+  ],
 );
 
 export const barbers = pgTable(
@@ -38,7 +59,10 @@ export const barbers = pgTable(
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("barbers_slug_idx").on(t.slug)],
+  (t) => [
+    uniqueIndex("barbers_slug_idx").on(t.slug),
+    uniqueIndex("barbers_user_id_unique_idx").on(t.userId).where(sql`${t.userId} is not null`),
+  ],
 );
 
 export const skills = pgTable("skills", {
@@ -56,6 +80,9 @@ export const barberSkills = pgTable(
     skillId: integer("skill_id")
       .notNull()
       .references(() => skills.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("APPROVED"), // APPROVED | PENDING | REJECTED
+    approvedBy: integer("approved_by").references(() => users.id),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("barber_skill_idx").on(t.barberId, t.skillId)],
 );
@@ -195,6 +222,13 @@ export const classes = pgTable(
   },
   (t) => [uniqueIndex("classes_slug_idx").on(t.slug)],
 );
+
+/** Admin-managed site content/configuration. */
+export const siteSettings = pgTable("site_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const classRegistrations = pgTable(
   "class_registrations",

@@ -6,7 +6,7 @@ export type GalleryItem = {
   barberName: string;
 };
 
-const categoryLabels: Record<string, string> = {
+export const GALLERY_CATEGORY_LABELS: Record<string, string> = {
   FADE: "فید",
   CROP: "کراپ",
   BEARD: "ریش",
@@ -18,6 +18,9 @@ const categoryLabels: Record<string, string> = {
   CREATIVE: "خلاقانه",
 };
 
+/** One shared option list for the public gallery and admin portfolio editor. */
+export const GALLERY_CATEGORY_KEYS = Object.keys(GALLERY_CATEGORY_LABELS);
+
 export function galleryCategoryLabel(category: string): string {
-  return categoryLabels[category] ?? category;
+  return GALLERY_CATEGORY_LABELS[category] ?? category;
 }

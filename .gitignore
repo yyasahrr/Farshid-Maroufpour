@@ -32,10 +32,10 @@ next-env.d.ts
 .pgdata*/
 *.log
 
-# drizzle migrations output (regenerable via drizzle-kit generate)
-drizzle/
+# Drizzle migrations and journal are the tracked database-change contract.
 
 # test artifacts
 artifacts/
 playwright-report/
 test-results/
+public/uploads/

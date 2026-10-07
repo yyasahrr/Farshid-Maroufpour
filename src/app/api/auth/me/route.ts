@@ -17,7 +17,7 @@ export async function GET() {
 
   return NextResponse.json({
     authenticated: true,
-    user,
+    user: { id: user.id, name: user.name, phone: user.phone, role: user.role, roles: user.roles },
     policyAccepted,
     policyVersion: POLICY_CURRENT_VERSION,
   });

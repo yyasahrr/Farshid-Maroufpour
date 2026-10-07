@@ -10,6 +10,7 @@ import {
   WhyChooseUs,
 } from "@/components/home/HomePageSections";
 import { getGalleryItems, getHomeBarbers, getServices } from "@/lib/queries";
+import { getHeroSettings } from "@/lib/hero-settings";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -37,10 +38,11 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [services, barbers, portfolio] = await Promise.all([
+  const [services, barbers, portfolio, heroSettings] = await Promise.all([
     getServices(),
     getHomeBarbers(),
     getGalleryItems(4),
+    getHeroSettings(),
   ]);
 
   return (
@@ -65,7 +67,7 @@ export default async function HomePage() {
           }),
         }}
       />
-      <HomeHero />
+      <HomeHero settings={heroSettings} />
       <WhyChooseUs />
       <HomeServices services={services} />
       <HomeTeam barbers={barbers} />

@@ -16,7 +16,7 @@ import { AvailabilityHeatmap } from "@/components/heatmap";
 import { NotificationList } from "@/components/notifications";
 import { buildVisitGroups, nextHandoff, segmentsFor } from "@/lib/visits";
 import { heatmap } from "@/lib/availability";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isStaff } from "@/lib/session";
 import {
   applyScheduleTemplateAction,
   blockTimeAction,
@@ -61,7 +61,7 @@ const STATUS_FA: Record<string, string> = {
 export default async function BarberDashboard() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role !== "BARBER" || !user.barberId) redirect("/admin");
+  if (!user.permissions.has("booking:self") || !user.barberId) redirect(isStaff(user) ? "/admin" : "/login");
 
   const barberId = user.barberId;
   const today = todayISO();

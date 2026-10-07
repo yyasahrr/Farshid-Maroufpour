@@ -12,6 +12,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { barberServices, barberSkills, barbers, services } from "@/db/schema";
 
+/** Only manager-approved claims may unlock a service in scheduling. */
+export const SKILL_APPROVED = "APPROVED" as const;
+
 export type ResolvedService = {
   id: number;
   name: string;
@@ -69,7 +72,7 @@ export async function resolveService(
     const [approvedSkill] = await db
       .select({ id: barberSkills.id })
       .from(barberSkills)
-      .where(and(eq(barberSkills.barberId, barberId), eq(barberSkills.skillId, svc.requiredSkillId)))
+      .where(and(eq(barberSkills.barberId, barberId), eq(barberSkills.skillId, svc.requiredSkillId), eq(barberSkills.status, SKILL_APPROVED)))
       .limit(1);
     if (!approvedSkill) return null;
   }

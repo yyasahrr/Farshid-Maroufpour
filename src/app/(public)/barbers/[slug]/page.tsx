@@ -39,7 +39,7 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
       .select({ name: skills.name })
       .from(barberSkills)
       .innerJoin(skills, eq(barberSkills.skillId, skills.id))
-      .where(eq(barberSkills.barberId, barber.id)),
+      .where(and(eq(barberSkills.barberId, barber.id), eq(barberSkills.status, "APPROVED"))),
     db.select().from(portfolioItems).where(eq(portfolioItems.barberId, barber.id)),
     db
       .select({ id: reviews.id, name: reviews.clientName, rating: reviews.rating, comment: reviews.comment })

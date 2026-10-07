@@ -2,16 +2,21 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { sessionSigningSecret } from "@/lib/server-secret";
 import { db } from "@/db";
-import { users, barbers } from "@/db/schema";
+import { users, barbers, userRoles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { Permission, Role, permissionsForRoles, rolesFromLegacyRole } from "@/lib/rbac";
 
-export type Role = "SUPER_ADMIN" | "RECEPTIONIST" | "BARBER" | "CLIENT";
+export type { Role };
 
 export type SessionUser = {
   id: number;
   name: string;
   phone: string;
+  /** Legacy primary role kept only for display fallbacks. */
   role: Role;
+  /** Multi-role membership — the authorization source of truth. */
+  roles: Role[];
+  permissions: Set<Permission>;
   barberId: number | null;
 };
 
@@ -64,11 +69,31 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   if (!token) return null;
   const userId = await verifyToken(token);
   if (!userId) return null;
+  return loadSessionUser(userId);
+}
+
+export async function loadSessionUser(userId: number): Promise<SessionUser | null> {
   const [row] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!row) return null;
+  const memberships = await db
+    .select({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.userId, row.id));
+  // A user without an explicit membership row falls back to the legacy column.
+  const roles = memberships.length
+    ? [...new Set(memberships.map((m) => m.role as Role))]
+    : rolesFromLegacyRole(row.role);
+  const hasBarberRole =
+    roles.includes("BARBER") || roles.includes("INSTRUCTOR") || roles.includes("SUPER_ADMIN");
   let barberId: number | null = null;
-  if (row.role === "BARBER") {
-    const [b] = await db.select().from(barbers).where(eq(barbers.userId, row.id)).limit(1);
+  if (hasBarberRole) {
+    const [b] = await db
+      .select({ id: barbers.id })
+      .from(barbers)
+      // Panel access follows the BARBER/INSTRUCTOR role even when the public
+      // profile is inactive; customer discovery and booking still gate on active.
+      .where(eq(barbers.userId, row.id))
+      .limit(1);
     barberId = b?.id ?? null;
   }
   return {
@@ -76,25 +101,44 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     name: row.name,
     phone: row.phone,
     role: row.role as Role,
+    roles,
+    permissions: permissionsForRoles(roles),
     barberId,
   };
 }
 
 export async function requireRole(roles: Role[]): Promise<SessionUser> {
   const user = await getCurrentUser();
-  if (!user || !roles.includes(user.role)) {
+  if (!user || !roles.some((role) => user.roles.includes(role))) {
     throw new Error("UNAUTHORIZED");
   }
   return user;
 }
 
-export function isStaff(role: Role) {
-  return role === "SUPER_ADMIN" || role === "RECEPTIONIST";
+export async function requirePermission(permission: Permission): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user || !user.permissions.has(permission)) throw new Error("UNAUTHORIZED");
+  return user;
+}
+
+const STAFF_PANEL_ROLES: readonly Role[] = ["SUPER_ADMIN", "MANAGER", "RECEPTIONIST"];
+
+/** True when any of the user's roles opens the operations side (admin panels).
+ * The string overload keeps older server pages/actions source-compatible while
+ * they migrate from the legacy users.role column to membership-aware checks. */
+export function isStaff(user: { roles: readonly Role[] } | Role) {
+  if (typeof user === "string") return STAFF_PANEL_ROLES.includes(user);
+  return user.roles.some((role) => STAFF_PANEL_ROLES.includes(role));
 }
 
 /** Panel a signed-in account lands on after login. */
-export function landingPathFor(role: Role): string {
-  if (role === "BARBER") return "/barber";
-  return isStaff(role) ? "/admin" : "/account";
+export function landingPathFor(user: Pick<SessionUser, "roles" | "permissions"> | Role): string {
+  if (typeof user === "string") {
+    if (user === "BARBER" || user === "INSTRUCTOR") return "/barber";
+    return isStaff(user) ? "/admin" : "/account";
+  }
+  if (isStaff(user)) return "/admin";
+  if (user.permissions.has("booking:self")) return "/barber";
+  return "/account";
 }
 

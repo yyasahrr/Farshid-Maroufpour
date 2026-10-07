@@ -31,7 +31,7 @@ export async function loadBookingData() {
         if (!service) return false;
         if (!service.requiredSkillId) return true;
         return skillRows.some(
-          (skill) => skill.barberId === barberId && skill.skillId === service.requiredSkillId,
+          (skill) => skill.barberId === barberId && skill.skillId === service.requiredSkillId && skill.status === "APPROVED",
         );
       })
       .map((link) => link.serviceId);

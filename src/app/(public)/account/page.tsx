@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { appointments, barbers, classes, classRegistrations, payments, services } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { CustomerPanelClient, type CustomerVisit } from "@/components/customer/CustomerPanelClient";
+import { StaffAccountSection } from "@/components/customer/StaffAccountSection";
 import { CustomerLoginPrompt } from "@/components/customer/CustomerLoginPrompt";
 import { buildVisitGroups, visitStatus } from "@/lib/visits";
 import { todayISO } from "@/lib/time";
@@ -144,6 +145,9 @@ export default async function AccountPage() {
 
   return (
     <div className="ui-shell ui-container ui-page">
+      {user.roles.some((role) => !["CLIENT", "TRAINEE"].includes(role)) && (
+        <StaffAccountSection user={user} canViewTeam={user.permissions.has("staff:view") || user.permissions.has("roles:manage")} />
+      )}
       <CustomerPanelClient
         user={{ id: user.id, name: user.name, phone: user.phone, role: user.role }}
         upcoming={upcoming}

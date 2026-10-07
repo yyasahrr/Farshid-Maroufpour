@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { services } from "@/db/schema";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isStaff } from "@/lib/session";
 import { SiteNavigation } from "@/components/site-navigation";
 import { BrandMonogram, Icon } from "@/components/icons";
 export { MobileNav } from "@/components/mobile-nav";
@@ -12,7 +12,7 @@ export async function SiteHeader() {
     getCurrentUser(),
     db.select({ id: services.id, name: services.name }).from(services).where(eq(services.active, true)),
   ]);
-  const panelHref = user?.role === "BARBER" ? "/barber" : user && user.role !== "CLIENT" ? "/admin" : "/account";
+  const panelHref = user ? (isStaff(user) ? "/admin" : user.barberId ? "/barber" : "/account") : "/account";
   return <SiteNavigation services={serviceRows} panelHref={panelHref} userName={user?.name ?? null} />;
 }
 
