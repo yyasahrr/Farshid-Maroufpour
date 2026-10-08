@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   pgTable,
@@ -249,7 +250,12 @@ export const siteContentDocuments = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
   },
-  (t) => [uniqueIndex("site_content_documents_slug_unique_idx").on(t.slug)],
+  (t) => [
+    uniqueIndex("site_content_documents_slug_unique_idx").on(t.slug),
+    check("site_content_documents_slug_check", sql`${t.slug} ~ '^[a-z0-9][a-z0-9-]{0,79}$'`),
+    check("site_content_documents_draft_version_check", sql`${t.draftVersion} > 0`),
+    check("site_content_documents_published_version_check", sql`${t.publishedVersion} is null or ${t.publishedVersion} > 0`),
+  ],
 );
 
 /** Server-managed metadata for files in the reusable media library. */
@@ -268,6 +274,8 @@ export const mediaAssets = pgTable(
   (t) => [
     uniqueIndex("media_assets_storage_key_unique_idx").on(t.storageKey),
     index("media_assets_created_at_idx").on(t.createdAt),
+    check("media_assets_media_type_check", sql`${t.mediaType} in ('image', 'video')`),
+    check("media_assets_file_size_check", sql`${t.fileSize} > 0`),
   ],
 );
 

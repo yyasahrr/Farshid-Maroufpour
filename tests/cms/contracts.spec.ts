@@ -15,6 +15,7 @@ import {
   isSafeStoredMediaKey,
   sanitizeOriginalMediaName,
 } from "../../src/lib/media-validation";
+import { mediaStorageRoot } from "../../src/lib/media-storage";
 
 const root = process.cwd();
 
@@ -64,6 +65,26 @@ test("media names and storage keys cannot become filesystem paths", () => {
   expect(isSafeLegacyUploadName("old-photo_2.webp")).toBe(true);
   expect(isSafeLegacyUploadName("../old-photo.webp")).toBe(false);
   expect(isSafeLegacyUploadName("folder/photo.webp")).toBe(false);
+});
+
+test("media storage uses a private default and rejects unsafe configured roots", () => {
+  const previousRoot = process.env.MEDIA_STORAGE_DIR;
+  try {
+    delete process.env.MEDIA_STORAGE_DIR;
+    expect(mediaStorageRoot()).toBe(path.join(root, "var", "media"));
+
+    process.env.MEDIA_STORAGE_DIR = path.join(root, "var", "persistent-media");
+    expect(mediaStorageRoot()).toBe(path.join(root, "var", "persistent-media"));
+
+    process.env.MEDIA_STORAGE_DIR = path.join(root, "public", "uploads");
+    expect(() => mediaStorageRoot()).toThrow("MEDIA_STORAGE_DIR_MUST_BE_OUTSIDE_PUBLIC");
+
+    process.env.MEDIA_STORAGE_DIR = "var/media";
+    expect(() => mediaStorageRoot()).toThrow("MEDIA_STORAGE_DIR_MUST_BE_ABSOLUTE");
+  } finally {
+    if (previousRoot === undefined) delete process.env.MEDIA_STORAGE_DIR;
+    else process.env.MEDIA_STORAGE_DIR = previousRoot;
+  }
 });
 
 test("CMS roles follow the existing settings permission rather than client-side UI", () => {

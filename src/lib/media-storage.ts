@@ -3,10 +3,12 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { isSafeLegacyUploadName, isSafeStoredMediaKey } from "@/lib/media-validation";
 
+/** Store new assets outside `public`; set MEDIA_STORAGE_DIR to a persistent private volume in production. */
 export function mediaStorageRoot(): string {
   const configured = process.env.MEDIA_STORAGE_DIR?.trim();
-  const root = configured ? path.resolve(configured) : path.join(process.cwd(), "var", "media");
-  const publicRoot = path.resolve(process.cwd(), "public");
+  const root = configured ? path.normalize(configured) : path.join(process.cwd(), "var", "media");
+  if (configured && !path.isAbsolute(root)) throw new Error("MEDIA_STORAGE_DIR_MUST_BE_ABSOLUTE");
+  const publicRoot = path.join(process.cwd(), "public");
   const relativeToPublic = path.relative(publicRoot, root);
   if (relativeToPublic === "" || (!relativeToPublic.startsWith("..") && !path.isAbsolute(relativeToPublic)))
     throw new Error("MEDIA_STORAGE_DIR_MUST_BE_OUTSIDE_PUBLIC");
@@ -14,7 +16,7 @@ export function mediaStorageRoot(): string {
 }
 
 function assertContained(root: string, filename: string): string | null {
-  const fullPath = path.resolve(root, filename);
+  const fullPath = path.join(root, filename);
   const relative = path.relative(root, fullPath);
   if (!relative || relative.startsWith(`..${path.sep}`) || relative === ".." || path.isAbsolute(relative)) return null;
   return fullPath;
@@ -41,7 +43,7 @@ export async function resolveMediaFile(storageKey: string): Promise<string | nul
 
   const roots = [mediaStorageRoot()];
   const publicLegacyRoot = path.join(process.cwd(), "public", "uploads");
-  if (path.resolve(publicLegacyRoot) !== path.resolve(roots[0])) roots.push(publicLegacyRoot);
+  roots.push(publicLegacyRoot);
 
   for (const root of roots) {
     try {

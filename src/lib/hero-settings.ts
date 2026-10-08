@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { siteContentDocuments, siteSettings } from "@/db/schema";
-import { parseHomeSiteContentJson } from "@/lib/site-content-contract";
+import { isSafeLocalMediaUrl, parseHomeSiteContentJson } from "@/lib/site-content-contract";
 
 export const HERO_SETTING_KEY = "hero";
 export const HOME_CONTENT_DOCUMENT_KEY = "home";
@@ -46,7 +46,7 @@ export async function getLegacyHeroSettings(): Promise<HeroSettings> {
     const mediaType = input.mediaType === "image" || input.mediaType === "video" ? input.mediaType : "video";
     const mediaUrl = (key: "desktopMediaUrl" | "mobileMediaUrl", fallback: string) => {
       const value = input[key];
-      return typeof value === "string" && value.startsWith("/") && !value.includes("..") ? value : fallback;
+      return typeof value === "string" && isSafeLocalMediaUrl(value, mediaType) ? value : fallback;
     };
 
     return {
