@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { resolveService, nextAvailable } from "@/lib/availability";
 import { Badge, Stars } from "@/components/ui-cards";
+import { ProfessionalAvatar } from "@/components/ProfessionalAvatar";
 import { Icon } from "@/components/icons";
 import { formatPersianDate, formatPrice, minutesToLabel, todayISO } from "@/lib/time";
 
@@ -40,7 +41,7 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
       .from(barberSkills)
       .innerJoin(skills, eq(barberSkills.skillId, skills.id))
       .where(and(eq(barberSkills.barberId, barber.id), eq(barberSkills.status, "APPROVED"))),
-    db.select().from(portfolioItems).where(eq(portfolioItems.barberId, barber.id)),
+    db.select().from(portfolioItems).where(and(eq(portfolioItems.barberId, barber.id), eq(portfolioItems.isPublic, true))),
     db
       .select({ id: reviews.id, name: reviews.clientName, rating: reviews.rating, comment: reviews.comment })
       .from(reviews)
@@ -133,7 +134,10 @@ export default async function BarberProfile({ params }: { params: Promise<{ slug
 
           <div>
             <Badge tone="brand">{barber.title}</Badge>
-            <h1 className="mt-3 text-[clamp(28px,4vw,42px)] leading-[1.4] font-black">{barber.name}</h1>
+            <div className="mt-3 flex items-center gap-3">
+              <ProfessionalAvatar name={barber.name} imageUrl={barber.imageUrl} size="lg" decorative />
+              <h1 className="text-[clamp(28px,4vw,42px)] leading-[1.4] font-black">{barber.name}</h1>
+            </div>
             <p className="mt-2 text-sm text-bone-500">
               {barber.experienceYears.toLocaleString("fa-IR")} سال سابقه
               {rating !== null && (

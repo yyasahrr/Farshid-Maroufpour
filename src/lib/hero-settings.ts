@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { siteSettings } from "@/db/schema";
+import { siteContentDocuments, siteSettings } from "@/db/schema";
+import { parseHomeSiteContentJson } from "@/lib/site-content-contract";
 
 export const HERO_SETTING_KEY = "hero";
+export const HOME_CONTENT_DOCUMENT_KEY = "home";
 
 export type HeroSettings = {
   headline: string;
@@ -24,8 +26,8 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   mobileMediaUrl: "/video/barber-mobile.mp4",
 };
 
-/** Read persisted Hero copy/media with safe, code-owned defaults. */
-export async function getHeroSettings(): Promise<HeroSettings> {
+/** Read only the historic singleton value so old installations keep working. */
+export async function getLegacyHeroSettings(): Promise<HeroSettings> {
   try {
     const [row] = await db
       .select({ value: siteSettings.value })
@@ -37,11 +39,7 @@ export async function getHeroSettings(): Promise<HeroSettings> {
     const parsed: unknown = JSON.parse(row.value);
     if (typeof parsed !== "object" || parsed === null) return DEFAULT_HERO_SETTINGS;
     const input = parsed as Record<string, unknown>;
-    const copy = (
-      key: "headline" | "subtitle" | "primaryCtaLabel" | "secondaryCtaLabel",
-      fallback: string,
-      max: number,
-    ) => {
+    const copy = (key: keyof Pick<HeroSettings, "headline" | "subtitle" | "primaryCtaLabel" | "secondaryCtaLabel">, fallback: string, max: number) => {
       const value = input[key];
       return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
     };
@@ -63,4 +61,20 @@ export async function getHeroSettings(): Promise<HeroSettings> {
   } catch {
     return DEFAULT_HERO_SETTINGS;
   }
+}
+
+/** Public callers receive a published CMS revision, with a safe legacy fallback. */
+export async function getHeroSettings(): Promise<HeroSettings> {
+  try {
+    const [row] = await db
+      .select({ publishedContent: siteContentDocuments.publishedContent })
+      .from(siteContentDocuments)
+      .where(eq(siteContentDocuments.slug, HOME_CONTENT_DOCUMENT_KEY))
+      .limit(1);
+    const content = parseHomeSiteContentJson(row?.publishedContent);
+    if (content) return content.hero;
+  } catch {
+    // The forward-only CMS migration may not yet have been applied.
+  }
+  return getLegacyHeroSettings();
 }

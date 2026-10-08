@@ -18,6 +18,7 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.json",
     "db:studio": "drizzle-kit studio --config=drizzle.config.json",
     "test:planner": "playwright test --project=planner",
+    "test:cms": "playwright test --project=cms",
     "test:e2e": "playwright test --project=desktop --project=tablet --project=mobile"
   },
   "dependencies": {

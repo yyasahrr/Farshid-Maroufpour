@@ -22,6 +22,11 @@ export default defineConfig({
       testDir: "./tests/planner",
     },
     {
+      name: "cms",
+      testDir: "./tests/cms",
+      use: {},
+    },
+    {
       name: "desktop",
       use: { browserName: "chromium", viewport: { width: 1440, height: 900 } },
     },

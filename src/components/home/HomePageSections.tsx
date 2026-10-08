@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icons";
 import type { getServices, getHomeBarbers } from "@/lib/queries";
 import type { GalleryItem } from "@/lib/gallery";
+import type { HomeSiteContent } from "@/lib/site-content-contract";
 import { galleryCategoryLabel } from "@/lib/gallery";
 import { CONTACT_PHONE_TEL } from "@/lib/site";
 import { isRemoteImage, safeImageUrl } from "@/lib/service-media";
@@ -81,7 +82,7 @@ function serviceIcon(slug: string): IconName {
   }
 }
 
-export function WhyChooseUs() {
+export function WhyChooseUs({ content }: { content: HomeSiteContent["about"] }) {
   const reasons = [
     {
       icon: "calendar" as const,
@@ -109,13 +110,9 @@ export function WhyChooseUs() {
       <div className="public-container">
         <div data-reveal="" className="max-w-2xl">
           <h2 className="text-3xl leading-[1.3] font-black text-bone-700 text-balance sm:text-4xl">
-            دربارهٔ ما
+            {content.heading}
           </h2>
-          <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">
-            فرشید معروف پور، سالن پیرایش مردانه و آکادمی آموزش تخصصی را کنار هم
-            گرد آورده است. خدمات، تخصص آرایشگران و دوره‌های آکادمی را بررسی کن و
-            بعد مسیر مناسب خودت را انتخاب کن.
-          </p>
+          <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">{content.body}</p>
         </div>
         <ol className="mt-8 grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
           {reasons.map((reason) => (
@@ -231,8 +228,8 @@ export function HomeServices({ services }: { services: HomeService[] }) {
   );
 }
 
-export function HomeTeam({ barbers }: { barbers: HomeBarber[] }) {
-  const founder = barbers.find((barber) => barber.title.includes("بنیان‌گذار"));
+export function HomeTeam({ barbers, content }: { barbers: HomeBarber[]; content: HomeSiteContent["team"] }) {
+  const founder = barbers.find((barber) => barber.featured) ?? barbers.find((barber) => barber.title.includes("بنیان‌گذار"));
   const teamMembers = founder
     ? barbers.filter((barber) => barber.id !== founder.id)
     : barbers;
@@ -246,12 +243,9 @@ export function HomeTeam({ barbers }: { barbers: HomeBarber[] }) {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div data-reveal="" className="max-w-2xl">
             <h2 className="text-3xl leading-[1.3] font-black text-bone-700 text-balance sm:text-4xl">
-              با تیم ما آشنا شو
+              {content.heading}
             </h2>
-            <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">
-              تخصص هر آرایشگر را ببین و کسی را انتخاب کن که با خواسته‌ات هماهنگ
-              است.
-            </p>
+            <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">{content.body}</p>
           </div>
           <Link
             href="/barbers"
@@ -280,6 +274,7 @@ export function HomeTeam({ barbers }: { barbers: HomeBarber[] }) {
             </Link>
             <div className="flex min-w-0 flex-col justify-center p-5 sm:p-8 lg:p-10">
               <p className="text-sm font-bold text-brass-700">
+                {founder.featured && <span className="me-2 rounded-full bg-brass-50 px-2 py-1 text-[11px]">آرایشگر ویژه</span>}
                 {founder.title}
               </p>
               <h3 className="mt-2 text-2xl font-black text-bone-700 sm:text-3xl">
@@ -363,7 +358,7 @@ export function HomeTeam({ barbers }: { barbers: HomeBarber[] }) {
   );
 }
 
-export function HomePortfolio({ items }: { items: GalleryItem[] }) {
+export function HomePortfolio({ items, content }: { items: GalleryItem[]; content: HomeSiteContent["portfolio"] }) {
   return (
     <section
       id="work"
@@ -376,12 +371,9 @@ export function HomePortfolio({ items }: { items: GalleryItem[] }) {
         >
           <div className="max-w-2xl">
             <h2 className="text-3xl leading-[1.3] font-black text-bone-700 text-balance sm:text-4xl">
-              نمونه‌کارهای تیم
+              {content.heading}
             </h2>
-            <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">
-              سبک‌های ثبت‌شده توسط آرایشگران را ببین و برای آشنایی با هر متخصص،
-              پروفایلش را باز کن.
-            </p>
+            <p className="mt-3 max-w-xl text-base leading-8 text-bone-500">{content.body}</p>
           </div>
           <Link
             href="/work"
@@ -457,7 +449,7 @@ export function HomePortfolio({ items }: { items: GalleryItem[] }) {
   );
 }
 
-export function HomeAcademy() {
+export function HomeAcademy({ content }: { content: HomeSiteContent["academy"] }) {
   return (
     <section className="home-page-section public-container pb-14 sm:pb-16">
       <div
@@ -478,12 +470,9 @@ export function HomeAcademy() {
             <Icon name="cap" className="h-5 w-5" weight="strong" />
           </span>
           <h2 className="mt-4 max-w-lg text-3xl leading-[1.35] font-black text-bone-700 text-balance sm:text-4xl">
-            مهارت حرفه‌ای با تمرین ساخته می‌شود
+            {content.heading}
           </h2>
-          <p className="mt-3 max-w-lg text-base leading-8 text-bone-600">
-            دوره‌ها و کارگاه‌های آکادمی را ببین و مسیر یادگیری پیرایش را شروع
-            کن.
-          </p>
+          <p className="mt-3 max-w-lg text-base leading-8 text-bone-600">{content.body}</p>
           <Link href="/academy" className="ui-button mt-5 min-h-12 !px-6">
             دیدن دوره‌های آکادمی
           </Link>
@@ -493,7 +482,7 @@ export function HomeAcademy() {
   );
 }
 
-export function HomeBookingCallout() {
+export function HomeBookingCallout({ content }: { content: HomeSiteContent["booking"] }) {
   return (
     <section className="home-page-section public-container pb-14 sm:pb-16">
       <div
@@ -501,12 +490,8 @@ export function HomeBookingCallout() {
         className="flex flex-col items-start justify-between gap-5 rounded-[20px] bg-bone-700 px-5 py-7 text-white sm:flex-row sm:items-center sm:px-9 sm:py-8"
       >
         <div className="max-w-2xl">
-          <h2 className="text-2xl leading-[1.35] font-black text-balance sm:text-3xl">
-            برای انتخاب خدمت راهنمایی می‌خواهی؟
-          </h2>
-          <p className="mt-2 text-sm leading-7 text-[#d5dfe0] sm:text-base">
-            پذیرش برای انتخاب خدمت یا آرایشگر راهنمایی‌ات می‌کند.
-          </p>
+          <h2 className="text-2xl leading-[1.35] font-black text-balance sm:text-3xl">{content.heading}</h2>
+          <p className="mt-2 text-sm leading-7 text-[#d5dfe0] sm:text-base">{content.body}</p>
         </div>
         <a
           href={`tel:${CONTACT_PHONE_TEL}`}

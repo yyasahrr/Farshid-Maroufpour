@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { ProfessionalAvatar } from "@/components/ProfessionalAvatar";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
 import { Panel } from "@/components/dashboard-shell";
@@ -84,11 +85,14 @@ export function TeamMemberEditor(data: TeamMemberEditorData) {
     <div className="space-y-6">
       <header className="ops-panel !bg-[#f7f7f2]">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-4">
+            <ProfessionalAvatar name={barber?.name ?? user.name} imageUrl={barber?.imageUrl} size="lg" decorative />
+            <div className="min-w-0">
             <Link href="/admin/team" className="ops-link text-xs">← بازگشت به اعضای تیم</Link>
             <h1 className="mt-2 truncate text-2xl font-black sm:text-3xl">{user.name}</h1>
             <p dir="ltr" className="mt-1 text-start text-sm tabular-nums text-bone/60">{user.phone}</p>
             <div className="mt-3"><RoleChips roles={roles.length ? roles : rolesFromLegacyRole(user.role)} /></div>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {barber?.active && <Link href={`/barbers/${barber.slug}`} target="_blank" rel="noreferrer" className="ops-btn min-h-11"><Icon name="user" className="h-4 w-4" />مشاهده پروفایل عمومی</Link>}
@@ -311,6 +315,7 @@ export function TeamMemberEditor(data: TeamMemberEditorData) {
                         <input type="hidden" name="barberId" value={barber.id} /><input type="hidden" name="itemId" value={item.id} />
                         <div><label htmlFor={`work-title-${item.id}`} className="ops-label">عنوان</label><input id={`work-title-${item.id}`} name="title" defaultValue={item.title} minLength={2} maxLength={100} required className={fieldClass} /></div>
                         <div><label htmlFor={`work-category-${item.id}`} className="ops-label">دسته‌بندی</label><select id={`work-category-${item.id}`} name="category" defaultValue={item.category} className={fieldClass}>{GALLERY_CATEGORY_KEYS.map((key) => <option key={key} value={key}>{galleryCategoryLabel(key)}</option>)}</select></div>
+                        <label className="flex min-h-11 items-center gap-2 text-xs font-semibold"><input type="checkbox" name="isPublic" defaultChecked={item.isPublic} className={checkClass} />نمایش در گالری عمومی</label>
                         <div><label htmlFor={`work-image-${item.id}`} className="ops-label">آدرس تصویر</label><input id={`work-image-${item.id}`} name="imageUrl" dir="ltr" defaultValue={item.imageUrl} required className={fieldClass} /></div>
                         <div className="mt-2"><UploadButton targetId={`work-image-${item.id}`} label="تعویض تصویر" accept="image/jpeg,image/png,image/webp,image/avif" /></div>
                       </ActionForm>
@@ -332,6 +337,7 @@ export function TeamMemberEditor(data: TeamMemberEditorData) {
               <div className="grid gap-3 sm:grid-cols-2">
                 <div><label htmlFor={`new-work-title-${barber.id}`} className="ops-label">عنوان</label><input id={`new-work-title-${barber.id}`} name="title" required minLength={2} maxLength={100} className={fieldClass} /></div>
                 <div><label htmlFor={`new-work-category-${barber.id}`} className="ops-label">دسته‌بندی</label><select id={`new-work-category-${barber.id}`} name="category" className={fieldClass}>{GALLERY_CATEGORY_KEYS.map((key) => <option key={key} value={key}>{galleryCategoryLabel(key)}</option>)}</select></div>
+                <label className="flex min-h-11 items-center gap-2 text-xs font-semibold"><input type="checkbox" name="isPublic" defaultChecked className={checkClass} />نمایش در گالری عمومی</label>
                 <div className="sm:col-span-2"><label htmlFor={`new-work-image-${barber.id}`} className="ops-label">تصویر نمونه‌کار</label><input id={`new-work-image-${barber.id}`} name="imageUrl" dir="ltr" required className={fieldClass} placeholder="ابتدا تصویر را آپلود کنید" /><div className="mt-2"><UploadButton targetId={`new-work-image-${barber.id}`} label="آپلود تصویر" accept="image/jpeg,image/png,image/webp,image/avif" /></div></div>
               </div>
             </ActionForm>

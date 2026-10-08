@@ -57,11 +57,13 @@ export const barbers = pgTable(
     readme: text("readme").notNull().default(""),
     experienceYears: integer("experience_years").notNull().default(1),
     active: boolean("active").notNull().default(true),
+    featured: boolean("featured").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex("barbers_slug_idx").on(t.slug),
     uniqueIndex("barbers_user_id_unique_idx").on(t.userId).where(sql`${t.userId} is not null`),
+    uniqueIndex("barbers_single_featured_idx").on(t.featured).where(sql`${t.featured} = true`),
   ],
 );
 
@@ -230,6 +232,45 @@ export const siteSettings = pgTable("site_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Editable pages keep a private draft beside the explicitly published revision. */
+export const siteContentDocuments = pgTable(
+  "site_content_documents",
+  {
+    id: serial("id").primaryKey(),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    draftContent: text("draft_content").notNull().default("{}"),
+    publishedContent: text("published_content"),
+    draftVersion: integer("draft_version").notNull().default(1),
+    publishedVersion: integer("published_version"),
+    updatedBy: integer("updated_by").references(() => users.id, { onDelete: "set null" }),
+    publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("site_content_documents_slug_unique_idx").on(t.slug)],
+);
+
+/** Server-managed metadata for files in the reusable media library. */
+export const mediaAssets = pgTable(
+  "media_assets",
+  {
+    id: serial("id").primaryKey(),
+    storageKey: text("storage_key").notNull(),
+    originalName: text("original_name").notNull(),
+    mediaType: text("media_type").notNull(),
+    mimeType: text("mime_type").notNull(),
+    fileSize: integer("file_size").notNull(),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("media_assets_storage_key_unique_idx").on(t.storageKey),
+    index("media_assets_created_at_idx").on(t.createdAt),
+  ],
+);
+
 export const classRegistrations = pgTable(
   "class_registrations",
   {
@@ -265,15 +306,20 @@ export const payments = pgTable(
   ],
 );
 
-export const portfolioItems = pgTable("portfolio_items", {
-  id: serial("id").primaryKey(),
-  barberId: integer("barber_id")
-    .notNull()
-    .references(() => barbers.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  category: text("category").notNull().default("FADE"),
-  imageUrl: text("image_url").notNull(),
-});
+export const portfolioItems = pgTable(
+  "portfolio_items",
+  {
+    id: serial("id").primaryKey(),
+    barberId: integer("barber_id")
+      .notNull()
+      .references(() => barbers.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    category: text("category").notNull().default("FADE"),
+    imageUrl: text("image_url").notNull(),
+    isPublic: boolean("is_public").notNull().default(true),
+  },
+  (t) => [index("portfolio_items_is_public_idx").on(t.isPublic, t.barberId)],
+);
 
 export const reviews = pgTable("reviews", {
   id: serial("id").primaryKey(),

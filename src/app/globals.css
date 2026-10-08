@@ -302,6 +302,55 @@ h3 {
   backdrop-filter: blur(16px);
 }
 
+/* Restrained Liquid Glass: only navigation and floating controls use translucency.
+   Solid, high-contrast colors remain the fallback for older/reduced-transparency UAs. */
+.liquid-glass {
+  background-color: rgba(253, 252, 249, 0.96);
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
+  backdrop-filter: blur(12px) saturate(1.12);
+  box-shadow: 0 8px 28px -16px rgb(7 23 15 / 0.34);
+}
+
+.liquid-glass[data-glass-tone="dark"] {
+  background-color: rgba(7, 23, 15, 0.94);
+  color: #fff;
+}
+
+.liquid-glass[data-glass-tone="light"] {
+  background-color: rgba(253, 252, 249, 0.96);
+  color: #1a2e25;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .liquid-glass[data-glass-tone="dark"] { background-color: #07170f; }
+  .liquid-glass[data-glass-tone="light"] { background-color: #fdfcf9; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .liquid-glass,
+  .liquid-glass[data-glass-tone="dark"],
+  .liquid-glass[data-glass-tone="light"] {
+    background-color: #fdfcf9;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .liquid-glass[data-glass-tone="dark"] {
+    background-color: #07170f;
+    color: #fff;
+  }
+}
+
+@media (forced-colors: active) {
+  .liquid-glass {
+    background: Canvas;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+}
+
 /* Images carry a 1px ring drawn just inside the edge so they read at the same
    depth as bordered surfaces. Pure black, never a tinted near-black, which would
    pick up the surface underneath and look like dirt on the image. */

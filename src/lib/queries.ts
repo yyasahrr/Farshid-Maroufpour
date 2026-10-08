@@ -1,4 +1,4 @@
-import { and, avg, count, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, avg, count, desc, eq, gte, sql } from "drizzle-orm";
 import { todayISO } from "@/lib/time";
 import { db } from "@/db";
 import {
@@ -86,9 +86,11 @@ export async function getHomeBarbers(limit = 4) {
       title: barbers.title,
       imageUrl: barbers.imageUrl,
       bio: barbers.bio,
+      featured: barbers.featured,
     })
     .from(barbers)
     .where(eq(barbers.active, true))
+    .orderBy(desc(barbers.featured), asc(barbers.id))
     .limit(limit);
 
   return Promise.all(
@@ -114,7 +116,7 @@ export async function getGalleryItems(limit?: number): Promise<GalleryItem[]> {
     })
     .from(portfolioItems)
     .innerJoin(barbers, eq(barbers.id, portfolioItems.barberId))
-    .where(eq(barbers.active, true))
+    .where(and(eq(barbers.active, true), eq(portfolioItems.isPublic, true)))
     .orderBy(desc(portfolioItems.id));
   return typeof limit === "number" ? query.limit(limit) : query;
 }

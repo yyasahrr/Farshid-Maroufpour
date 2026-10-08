@@ -61,7 +61,7 @@ export default async function AdminTeamPage({ searchParams }: { searchParams: Pr
             <h1 className="mt-2 text-2xl font-black sm:text-3xl">تیم سالن</h1>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-bone/65">نقش هر عضو دسترسی پنل او را مشخص می‌کند. پروفایل عمومی، خدمات، مهارت‌ها، برنامه و نمونه‌کارها در صفحهٔ همان عضو مدیریت می‌شوند.</p>
           </div>
-          {user.permissions.has("settings:manage") && <Link href="/admin/site-content" className="ops-btn ops-btn-quiet min-h-11">ویرایش هدر صفحهٔ اصلی</Link>}
+          {user.permissions.has("settings:manage") && <Link href="/admin/site-content" className="ops-btn ops-btn-quiet min-h-11">مدیریت محتوای سایت</Link>}
         </div>
       </header>
 

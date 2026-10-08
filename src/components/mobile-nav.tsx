@@ -53,7 +53,7 @@ export function MobileNav() {
       aria-label={isCustomerPanel ? "ناوبری پنل مشتری" : "ناوبری اصلی موبایل"}
       className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(10px,env(safe-area-inset-bottom))] md:hidden"
     >
-      <ul className="glass-floating mx-auto grid max-w-xl grid-cols-5 items-end gap-1 border border-white/70 px-2 pb-1 pt-2">
+      <ul className="liquid-glass mx-auto grid max-w-xl grid-cols-5 items-end gap-1 rounded-[20px] border border-white/70 px-2 pb-1 pt-2">
         {items.map((item) => {
           const isCurrent =
             (item.href === "/home" && pathname === "/home") ||

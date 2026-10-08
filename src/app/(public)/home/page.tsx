@@ -10,7 +10,7 @@ import {
   WhyChooseUs,
 } from "@/components/home/HomePageSections";
 import { getGalleryItems, getHomeBarbers, getServices } from "@/lib/queries";
-import { getHeroSettings } from "@/lib/hero-settings";
+import { getPublishedHomeContent } from "@/lib/home-content";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -38,11 +38,11 @@ export const metadata: Metadata = {
 };
 
 export default async function HomePage() {
-  const [services, barbers, portfolio, heroSettings] = await Promise.all([
+  const [services, barbers, portfolio, homeContent] = await Promise.all([
     getServices(),
     getHomeBarbers(),
     getGalleryItems(4),
-    getHeroSettings(),
+    getPublishedHomeContent(),
   ]);
 
   return (
@@ -67,13 +67,13 @@ export default async function HomePage() {
           }),
         }}
       />
-      <HomeHero settings={heroSettings} />
-      <WhyChooseUs />
+      <HomeHero settings={homeContent.hero} />
+      <WhyChooseUs content={homeContent.about} />
       <HomeServices services={services} />
-      <HomeTeam barbers={barbers} />
-      <HomePortfolio items={portfolio} />
-      <HomeAcademy />
-      <HomeBookingCallout />
+      <HomeTeam barbers={barbers} content={homeContent.team} />
+      <HomePortfolio items={portfolio} content={homeContent.portfolio} />
+      <HomeAcademy content={homeContent.academy} />
+      <HomeBookingCallout content={homeContent.booking} />
     </div>
   );
 }

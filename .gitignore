@@ -39,3 +39,4 @@ artifacts/
 playwright-report/
 test-results/
 public/uploads/
+/var/media/

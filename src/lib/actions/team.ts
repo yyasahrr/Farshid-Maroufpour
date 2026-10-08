@@ -506,16 +506,28 @@ export async function createPortfolioItemAction(
   const barberId = positiveId(formData.get("barberId"));
   const auth = barberId ? await authorizedBarber(barberId) : null;
   if (!barberId || !auth) return fail("دسترسی غیرمجاز.");
-  const parsed = z.object({ title: z.string().trim().min(2).max(100), category: z.string().min(1).max(40), imageUrl: z.string().trim().min(1).max(500) }).safeParse({
+  const parsed = z.object({
+    title: z.string().trim().min(2).max(100),
+    category: z.string().min(1).max(40),
+    imageUrl: z.string().trim().min(1).max(500),
+    isPublic: z.enum(["on", "off"]).optional().default("on"),
+  }).safeParse({
     title: formData.get("title"), category: formData.get("category"), imageUrl: formData.get("imageUrl"),
+    isPublic: formData.get("isPublic") === "on" ? "on" : "off",
   });
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "عنوان و تصویر را وارد کنید.");
   if (!validCategory(parsed.data.category)) return fail("دسته‌بندی نمونه‌کار معتبر نیست.");
   if (!validImageUrl(parsed.data.imageUrl)) return fail("تصویر باید فایل تصویری امن باشد.");
-  const [item] = await db.insert(portfolioItems).values({ barberId, title: parsed.data.title, category: parsed.data.category, imageUrl: parsed.data.imageUrl }).returning({ id: portfolioItems.id });
+  const [item] = await db.insert(portfolioItems).values({
+    barberId,
+    title: parsed.data.title,
+    category: parsed.data.category,
+    imageUrl: parsed.data.imageUrl,
+    isPublic: parsed.data.isPublic === "on",
+  }).returning({ id: portfolioItems.id });
   await audit(auth.actor.id, "PORTFOLIO_ITEM_CREATED", `barber:${barberId}:item:${item.id}`);
   await revalidateTeam(barberId, auth.barber.slug, auth.barber.userId ?? undefined);
-  return ok("نمونه‌کار افزوده شد و در گالری سایت نمایش داده می‌شود.");
+  return ok(parsed.data.isPublic === "on" ? "نمونه‌کار به گالری عمومی افزوده شد." : "نمونه‌کار به‌صورت خصوصی ذخیره شد.");
 }
 
 export async function updatePortfolioItemAction(
@@ -526,18 +538,29 @@ export async function updatePortfolioItemAction(
   const itemId = positiveId(formData.get("itemId"));
   const auth = barberId ? await authorizedBarber(barberId) : null;
   if (!barberId || !itemId || !auth) return fail("دسترسی غیرمجاز.");
-  const parsed = z.object({ title: z.string().trim().min(2).max(100), category: z.string().min(1).max(40), imageUrl: z.string().trim().min(1).max(500) }).safeParse({
+  const parsed = z.object({
+    title: z.string().trim().min(2).max(100),
+    category: z.string().min(1).max(40),
+    imageUrl: z.string().trim().min(1).max(500),
+    isPublic: z.enum(["on", "off"]).optional().default("on"),
+  }).safeParse({
     title: formData.get("title"), category: formData.get("category"), imageUrl: formData.get("imageUrl"),
+    isPublic: formData.get("isPublic") === "on" ? "on" : "off",
   });
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "اطلاعات نمونه‌کار معتبر نیست.");
   if (!validCategory(parsed.data.category)) return fail("دسته‌بندی نمونه‌کار معتبر نیست.");
   if (!validImageUrl(parsed.data.imageUrl)) return fail("تصویر باید فایل تصویری امن باشد.");
   const [item] = await db.select({ id: portfolioItems.id }).from(portfolioItems).where(and(eq(portfolioItems.id, itemId), eq(portfolioItems.barberId, barberId))).limit(1);
   if (!item) return fail("نمونه‌کار پیدا نشد.");
-  await db.update(portfolioItems).set({ title: parsed.data.title, category: parsed.data.category, imageUrl: parsed.data.imageUrl }).where(eq(portfolioItems.id, itemId));
+  await db.update(portfolioItems).set({
+    title: parsed.data.title,
+    category: parsed.data.category,
+    imageUrl: parsed.data.imageUrl,
+    isPublic: parsed.data.isPublic === "on",
+  }).where(eq(portfolioItems.id, itemId));
   await audit(auth.actor.id, "PORTFOLIO_ITEM_UPDATED", `barber:${barberId}:item:${itemId}`);
   await revalidateTeam(barberId, auth.barber.slug, auth.barber.userId ?? undefined);
-  return ok("تغییرات نمونه‌کار ذخیره شد.");
+  return ok(parsed.data.isPublic === "on" ? "نمونه‌کار ذخیره و عمومی شد." : "تغییرات ذخیره شد؛ نمونه‌کار از گالری عمومی پنهان است.");
 }
 
 export async function deletePortfolioItemAction(formData: FormData): Promise<void> {

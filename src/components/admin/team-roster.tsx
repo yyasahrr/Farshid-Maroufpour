@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { ProfessionalAvatar } from "@/components/ProfessionalAvatar";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { TEAM_ROLE_LABELS_FA, teamRoleTone } from "@/lib/team";
@@ -53,13 +53,7 @@ export function TeamRoster({ members, canManage }: { members: TeamRosterMember[]
         <ul className="mt-4 grid gap-3 xl:grid-cols-2">
           {visible.map((member) => (
             <li key={member.userId} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-[var(--color-border)] bg-white p-4 sm:flex-row sm:items-center">
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-[#e2efe8]">
-                {member.barber?.imageUrl ? (
-                  <Image src={member.barber.imageUrl} alt="" fill sizes="64px" className="object-cover" unoptimized={!member.barber.imageUrl.startsWith("/")} />
-                ) : (
-                  <span aria-hidden="true" className="flex h-full w-full items-center justify-center text-2xl font-black text-[#0f5a3b]">{member.name.slice(0, 1)}</span>
-                )}
-              </div>
+              <ProfessionalAvatar name={member.barber?.name ?? member.name} imageUrl={member.barber?.imageUrl} size="lg" decorative />
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-base font-black">{member.name}</h3>
                 <p className="mt-0.5 text-sm text-bone/65">{member.barber?.title ?? "عضو تیم"}</p>

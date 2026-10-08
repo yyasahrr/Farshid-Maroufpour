@@ -49,10 +49,11 @@ export function SiteNavigation({ services, panelHref, userName }: { services: Na
   return (
     <>
       <header
-        className={`sticky top-0 z-40 border-b transition-[background-color,border-color,backdrop-filter] duration-300 ease-out ${
+        data-glass-tone={transparentHeader ? "dark" : "light"}
+        className={`liquid-glass sticky top-0 z-40 border-b transition-[background-color,border-color,backdrop-filter] duration-300 ease-out ${
           homeHeader
-            ? `-mb-[68px] ${heroVisible ? "border-white/15 bg-[#07170f]/55 backdrop-blur-sm" : "border-[#e2e5df] bg-[#ffffffec] backdrop-blur-md"}`
-            : "border-[#e2e5df] bg-[#ffffffec] backdrop-blur-md"
+            ? `-mb-[68px] ${heroVisible ? "border-white/20" : "border-[#e2e5df]"}`
+            : "border-[#e2e5df]"
         }`}
       >
         <nav aria-label="ناوبری سایت" className="public-container flex h-[68px] items-center justify-between gap-2 sm:gap-4">
